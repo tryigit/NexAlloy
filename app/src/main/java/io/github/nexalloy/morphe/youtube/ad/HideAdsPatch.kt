@@ -16,6 +16,7 @@ import io.github.nexalloy.morphe.youtube.misc.litho.filter.LithoFilter
 import io.github.nexalloy.morphe.youtube.misc.playservice.VersionCheck
 import io.github.nexalloy.morphe.youtube.misc.settings.PreferenceScreen
 import io.github.nexalloy.patch
+import io.github.nexalloy.scopedHook
 
 val HideAds = patch(
     name = "Hide ads",
@@ -54,7 +55,7 @@ val HideAds = patch(
     ).forEach { fingerprint ->
         fingerprint.hookMethod {
             before {
-                if(AdsFilter.hideVideoAds())
+                if (AdsFilter.hideVideoAds())
                     it.result = null
             }
         }
@@ -110,7 +111,14 @@ val HideAds = patch(
             }
         })
 
-    // TODO Hide paid promotion label in miniplayer
+    // Hide paid promotion label in miniplayer
+    MiniplayerPaidPromotionLabelFingerprint.hookMethod(
+        scopedHook(::miniplayerPaidPromotionViewMethod.member) {
+            after { param ->
+                (param.result as? View)?.let(AdsFilter::hideMiniplayerPaidPromotionLabelView)
+            }
+        }
+    )
 
     // TODO [AdsFilter.hideAds] OsNameHook
     // TODO [AdsFilter.hideVideoAds] OsNameHook
