@@ -227,6 +227,42 @@ fun literal(
     location: InstructionLocation = InstructionLocation.MatchAfterAnywhere()
 ) = LiteralFilter(literal, opcodes, location)
 
+private const val MAX_ARRAY_DIMENSIONS = 255
+private val primitiveDescriptorTypes = "BCDFIJSZ"
+private val invalidUnqualifiedNameChars = charArrayOf('.', ';', '[', '/')
+
+private fun isValidUnqualifiedName(name: String): Boolean =
+    name.isNotEmpty() && invalidUnqualifiedNameChars.none(name::contains)
+
+private fun isValidMethodName(name: String): Boolean {
+    if (name == "<init>" || name == "<clinit>") return true
+    return isValidUnqualifiedName(name) && '<' !in name && '>' !in name
+}
+
+private fun isValidInternalClassName(name: String): Boolean =
+    name.isNotEmpty() && name.split('/').all(::isValidUnqualifiedName)
+
+private fun isValidObjectDescriptor(descriptor: String): Boolean =
+    descriptor.length >= 3 && descriptor.first() == 'L' && descriptor.last() == ';' &&
+        isValidInternalClassName(descriptor.substring(1, descriptor.lastIndex))
+
+private fun isValidFieldDescriptor(descriptor: String): Boolean {
+    if (descriptor.length == 1) return descriptor[0] in primitiveDescriptorTypes
+    if (isValidObjectDescriptor(descriptor)) return true
+    if (!descriptor.startsWith('[')) return false
+
+    val dimensions = descriptor.indexOfFirst { it != '[' }.let { if (it < 0) descriptor.length else it }
+    if (dimensions !in 1..MAX_ARRAY_DIMENSIONS || dimensions >= descriptor.length) return false
+    val component = descriptor.substring(dimensions)
+    return component.length == 1 && component[0] in primitiveDescriptorTypes ||
+        isValidObjectDescriptor(component)
+}
+
+private fun parameterSlotCount(descriptor: String): Int {
+    if (descriptor.startsWith('[') || descriptor.startsWith('L')) return 1
+    return if (descriptor == "J" || descriptor == "D") 2 else 1
+}
+
 class MethodCallFilter internal constructor(
     val definingClass: String? = null,
     val name: String? = null,
@@ -293,7 +329,6 @@ class MethodCallFilter internal constructor(
         private val regex = Regex(
             """^(L[^;]+;)->([^(\s]+)\(([^)]*)\)(V|[BCDFIJSZ]|L[^;]+;|\[+(?:[BCDFIJSZ]|L[^;]+;))${'$'}"""
         )
-        private val primitiveTypes = "BCDFIJSZ"
 
         internal fun parseJvmMethodCall(
             methodSignature: String,
@@ -302,12 +337,30 @@ class MethodCallFilter internal constructor(
         ): MethodCallFilter {
             val matchResult = regex.matchEntire(methodSignature)
                 ?: throw IllegalArgumentException("Invalid method signature: $methodSignature")
+
+            val classDescriptor = matchResult.groupValues[1]
+            val methodName = matchResult.groupValues[2]
+            val returnDescriptor = matchResult.groupValues[4]
+            require(isValidObjectDescriptor(classDescriptor)) {
+                "Invalid defining class descriptor: $classDescriptor"
+            }
+            require(isValidMethodName(methodName)) {
+                "Invalid method name: $methodName"
+            }
+            require(returnDescriptor == "V" || isValidFieldDescriptor(returnDescriptor)) {
+                "Invalid return descriptor: $returnDescriptor"
+            }
+
             val paramDescriptors = parseParameterDescriptors(matchResult.groupValues[3])
+            require(paramDescriptors.sumOf(::parameterSlotCount) <= 255) {
+                "Method parameter descriptors exceed 255 slots: $methodSignature"
+            }
+
             return MethodCallFilter(
-                matchResult.groupValues[1],
-                matchResult.groupValues[2],
+                classDescriptor,
+                methodName,
                 paramDescriptors,
-                matchResult.groupValues[4],
+                returnDescriptor,
                 opcodes,
                 location
             )
@@ -318,14 +371,23 @@ class MethodCallFilter internal constructor(
             while (i < params.length && params[i] == '[') i++
             require(i < params.length) { "Malformed type descriptor: $params" }
 
+            val dimensions = i - startIndex
+            require(dimensions <= MAX_ARRAY_DIMENSIONS) {
+                "Array descriptor exceeds $MAX_ARRAY_DIMENSIONS dimensions: $params"
+            }
+
             return if (params[i] == 'L') {
                 val semicolonPos = params.indexOf(';', i)
                 require(semicolonPos > i + 1) {
                     "Malformed object descriptor: $params"
                 }
+                val componentDescriptor = params.substring(i, semicolonPos + 1)
+                require(isValidObjectDescriptor(componentDescriptor)) {
+                    "Invalid object descriptor: $componentDescriptor"
+                }
                 params.substring(startIndex, semicolonPos + 1) to (semicolonPos + 1)
             } else {
-                require(params[i] in primitiveTypes) {
+                require(params[i] in primitiveDescriptorTypes) {
                     "Invalid parameter descriptor: $params"
                 }
                 params.substring(startIndex, i + 1) to (i + 1)
@@ -447,10 +509,24 @@ class FieldAccessFilter internal constructor(
         ): FieldAccessFilter {
             val matchResult = regex.matchEntire(fieldSignature)
                 ?: throw IllegalArgumentException("Invalid field access smali: $fieldSignature")
+
+            val classDescriptor = matchResult.groupValues[1]
+            val fieldName = matchResult.groupValues[2]
+            val fieldType = matchResult.groupValues[3]
+            require(isValidObjectDescriptor(classDescriptor)) {
+                "Invalid defining class descriptor: $classDescriptor"
+            }
+            require(isValidUnqualifiedName(fieldName)) {
+                "Invalid field name: $fieldName"
+            }
+            require(isValidFieldDescriptor(fieldType)) {
+                "Invalid field descriptor: $fieldType"
+            }
+
             return fieldAccess(
-                definingClass = matchResult.groupValues[1],
-                name = matchResult.groupValues[2],
-                type = matchResult.groupValues[3],
+                definingClass = classDescriptor,
+                name = fieldName,
+                type = fieldType,
                 opcodes = opcodes,
                 location = location
             )
