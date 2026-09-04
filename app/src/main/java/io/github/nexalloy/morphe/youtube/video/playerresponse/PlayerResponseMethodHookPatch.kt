@@ -22,7 +22,8 @@ val PlayerResponseMethodHook = patch {
     val PARAMETER_PLAYLIST_ID = 3
     val parameterIsShortAndOpeningOrPlaying =
         ::playerParameterBuilderFingerprint.dexMethod.paramTypeNames
-            .indexOfFirst { type -> type == "boolean" && ::playerParameterBuilderFingerprint.dexMethod.paramTypeNames.indexOf(type) >= 10 }
+            .withIndex()
+            .indexOfFirst { (index, type) -> index >= 10 && type == "boolean" }
 
     require(parameterIsShortAndOpeningOrPlaying >= 0) {
         "Player parameter builder is missing the Shorts state boolean parameter"
