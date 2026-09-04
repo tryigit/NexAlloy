@@ -12,15 +12,29 @@ import org.luckypray.dexkit.DexKitBridge
 import java.io.File
 import java.util.EnumSet
 
-class ApkContext(apkPath: String) {
+class ApkContext(apkPath: String) : AutoCloseable {
     val dexkit: DexKitBridge
     val jadx: JadxDecompiler
     val appVersion: AppVersion
 
     init {
         dexkit = setupDexKit(apkPath)
-        jadx = setupJadx(apkPath)
-        appVersion = jadx.getAppVersion()
+        jadx = try {
+            setupJadx(apkPath)
+        } catch (e: Throwable) {
+            dexkit.close()
+            throw e
+        }
+        appVersion = try {
+            jadx.getAppVersion()
+        } catch (e: Throwable) {
+            try {
+                dexkit.close()
+            } finally {
+                jadx.close()
+            }
+            throw e
+        }
     }
 
     companion object {
@@ -53,8 +67,13 @@ class ApkContext(apkPath: String) {
             security = JadxSecurity(JadxSecurityFlag.none())
         }
         val jadx = JadxDecompiler(jadxArgs)
-        jadx.load()
-        return jadx
+        try {
+            jadx.load()
+            return jadx
+        } catch (e: Throwable) {
+            jadx.close()
+            throw e
+        }
     }
 
     private fun JadxDecompiler.getAppVersion(): AppVersion {
@@ -64,5 +83,14 @@ class ApkContext(apkPath: String) {
             JadxSecurity(JadxSecurityFlag.none())
         )
         return AppVersion(manifest.parse().versionName)
+    }
+
+    override fun close() {
+        jadxResourceReader.remove()
+        try {
+            dexkit.close()
+        } finally {
+            jadx.close()
+        }
     }
 }
