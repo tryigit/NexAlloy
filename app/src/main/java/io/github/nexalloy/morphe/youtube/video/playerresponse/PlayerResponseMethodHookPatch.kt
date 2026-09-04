@@ -25,8 +25,6 @@ val PlayerResponseMethodHook = patch {
             val isShortAndOpeningOrPlaying =
                 param.args[parameterIsShortAndOpeningOrPlaying] as Boolean
 
-            // Bytecode insertion reverses the order of instructions added at the same index.
-            // Runtime callbacks execute directly, so preserve the final upstream execution order here.
             val beforeVideoIdHooks =
                 hooks.filterIsInstance<Hook.ProtoBufferParameterBeforeVideoId>()
             val videoIdHooks = hooks.filterIsInstance<Hook.VideoId>()
