@@ -17,7 +17,7 @@ fun getTypeNameCompat(it: String): String? {
         it == "this" -> null
         it.isNotEmpty() && it.all { char -> char == '[' } -> null
         it.trimStart('[').startsWith('L') && !it.endsWith(';') -> null
-        else -> getTypeName(it)
+        else -> runCatching { getTypeName(it) }.getOrNull()
     }
 }
 
