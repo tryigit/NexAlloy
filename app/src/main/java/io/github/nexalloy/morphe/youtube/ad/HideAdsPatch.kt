@@ -2,9 +2,7 @@ package io.github.nexalloy.morphe.youtube.ad
 
 import android.view.View
 import app.morphe.extension.shared.Logger
-import app.morphe.extension.shared.ResourceUtils
 import app.morphe.extension.youtube.patches.components.AdsFilter
-import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedHelpers
 import io.github.nexalloy.morphe.shared.ad.HideFullscreenAds
 import io.github.nexalloy.morphe.shared.misc.litho.filter.addLithoFilter
@@ -26,6 +24,7 @@ import io.github.nexalloy.morphe.youtube.misc.playservice.VersionCheck
 import io.github.nexalloy.morphe.youtube.misc.settings.PreferenceScreen
 import io.github.nexalloy.patch
 import io.github.nexalloy.scopedHook
+import org.luckypray.dexkit.wrap.DexMethod
 
 val HideAds = patch(
     name = "Hide ads",
@@ -108,23 +107,19 @@ val HideAds = patch(
         }
     }
 
-    val adAttributionId = ResourceUtils.getIdIdentifier("ad_attribution")
-    XposedHelpers.findAndHookMethod(
-        View::class.java.name,
-        lpparam.classLoader,
-        "findViewById",
-        Int::class.java.name,
-        object : XC_MethodHook() {
-            override fun afterHookedMethod(param: MethodHookParam) {
-                if (param.args[0] == adAttributionId) {
-                    val view = param.result as? View ?: return
-                    Logger.printDebug { "Hide Ad Attribution View" }
-                    AdsFilter.hideAdAttributionView(view)
-                }
+    val findViewById = DexMethod("Landroid/view/View;->findViewById(I)Landroid/view/View;").toMember()
+    ::adAttributionMethods.dexMethodList.forEach { outerMethod ->
+        outerMethod.hookMethod(scopedHook(findViewById) {
+            after { param ->
+                if (param.args[0] != adAttributionId) return@after
+                val view = param.result as? View ?: return@after
+                Logger.printDebug { "Hide Ad Attribution View" }
+                AdsFilter.hideAdAttributionView(view)
             }
         })
+    }
 
-    val miniplayerSubtitleId = ResourceUtils.getIdIdentifier("modern_miniplayer_subtitle_text")
+    val miniplayerSubtitleId = app.morphe.extension.shared.ResourceUtils.getIdIdentifier("modern_miniplayer_subtitle_text")
     MiniplayerPaidPromotionLabelFingerprint.hookMethod(
         scopedHook(::miniplayerPaidPromotionViewMethod.member) {
             after { param ->
