@@ -79,8 +79,19 @@ internal fun forceOriginalAudioPatch(
             .filter { it.type == setAudioTrack.declaringClass }
             .single()
             .apply { isAccessible = true }
-        var previousRecords: Array<*>? = null
-        var previousTracks: Array<ForceOriginalAudioPatch.AudioTrackInterface>? = null
+
+        class AudioTrackProxy(private val record: Any) : ForceOriginalAudioPatch.AudioTrackInterface {
+            override fun patch_getDisplayName(): String = displayNameField.get(record) as String
+
+            override fun patch_getId(): String = idField.get(record) as String
+
+            override fun patch_getIsDefault(): Boolean = isDefaultField.getBoolean(record)
+
+            override fun equals(other: Any?): Boolean =
+                other is AudioTrackProxy && record == other.record
+
+            override fun hashCode(): Int = record.hashCode()
+        }
 
         ::setVideoQualityListMethod.hookMethod {
             before { param ->
@@ -88,27 +99,9 @@ internal fun forceOriginalAudioPatch(
                 val rawTracks = trackArrayField.get(audioVideoFormat) as? Array<*> ?: return@before
                 if (rawTracks.isEmpty() || rawTracks.any { it == null }) return@before
 
-                val tracks = if (previousRecords?.contentEquals(rawTracks) == true) {
-                    previousTracks ?: return@before
-                } else {
-                    Array(rawTracks.size) { index ->
-                        val record = rawTracks[index]!!
-                        object : ForceOriginalAudioPatch.AudioTrackInterface {
-                            override fun patch_getDisplayName(): String =
-                                displayNameField.get(record) as String
-
-                            override fun patch_getId(): String =
-                                idField.get(record) as String
-
-                            override fun patch_getIsDefault(): Boolean =
-                                isDefaultField.getBoolean(record)
-                        }
-                    }.also {
-                        previousRecords = rawTracks.copyOf()
-                        previousTracks = it
-                    }
+                val tracks = Array<ForceOriginalAudioPatch.AudioTrackInterface>(rawTracks.size) { index ->
+                    AudioTrackProxy(rawTracks[index]!!)
                 }
-
                 val trackId = ForceOriginalAudioPatch.getDefaultAudioTrackId(tracks) ?: return@before
                 val playerController = playerControllerField.get(param.thisObject) ?: return@before
                 setAudioTrack.invoke(playerController, trackId)
