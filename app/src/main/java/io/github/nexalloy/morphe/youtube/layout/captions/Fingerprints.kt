@@ -7,6 +7,8 @@ import io.github.nexalloy.morphe.Opcode
 import io.github.nexalloy.morphe.OpcodesFilter
 import io.github.nexalloy.morphe.fieldAccess
 import io.github.nexalloy.morphe.findMethodDirect
+import io.github.nexalloy.morphe.findMethodListDirect
+import io.github.nexalloy.morphe.literal
 import io.github.nexalloy.morphe.methodCall
 import io.github.nexalloy.morphe.opcode
 import io.github.nexalloy.morphe.string
@@ -42,6 +44,24 @@ internal object SubtitleManagerFingerprint : Fingerprint(
 
 val subtitleManagerBooleanMethod = findMethodDirect {
     SubtitleManagerFingerprint.instructionMatches[1].instruction.methodRef!!
+}
+
+val noVolumeCaptionsFeatureFlagMethods = findMethodListDirect {
+    findMethod {
+        matcher {
+            literal { 45692436L }
+        }
+    }
+}
+
+val noVolumeCaptionsFeatureFlagGetters = findMethodListDirect {
+    noVolumeCaptionsFeatureFlagMethods()
+        .flatMap { it.invokes }
+        .filter { method ->
+            method.returnTypeName == "boolean" &&
+                method.paramTypeNames.any { it == "long" || it == "int" }
+        }
+        .distinctBy { it.descriptor }
 }
 
 internal object StartVideoInformerFingerprint : Fingerprint(
