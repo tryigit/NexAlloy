@@ -321,8 +321,14 @@ val VideoInformationPatch = patch(
         classLoader.loadClass(::playbackParametersSetterFingerprint.dexMethod.paramTypeNames[0])
 
     val floatFields = playbackParametersClass.declaredFields.filter { it.type == Float::class.java }
-    val speedField = floatFields[0]
-    val pitchField = floatFields[1]
+    require(floatFields.size == 2) {
+        "Expected exactly two float fields in ${playbackParametersClass.name}"
+    }
+    val probeSpeed = 1.25f
+    val probePitch = 0.75f
+    val probe = playbackParametersClass.new(probeSpeed, probePitch)
+    val speedField = floatFields.single { it.getFloat(probe) == probeSpeed }
+    val pitchField = floatFields.single { it.getFloat(probe) == probePitch }
     ::playbackParametersSetterFingerprint.hookMethod {
         before {
             val newParam = playbackParametersClass.new(
