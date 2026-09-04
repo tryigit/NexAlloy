@@ -79,6 +79,8 @@ internal fun forceOriginalAudioPatch(
             .filter { it.type == setAudioTrack.declaringClass }
             .single()
             .apply { isAccessible = true }
+        var previousRecords: Array<*>? = null
+        var previousTracks: Array<ForceOriginalAudioPatch.AudioTrackInterface>? = null
 
         ::setVideoQualityListMethod.hookMethod {
             before { param ->
@@ -86,17 +88,24 @@ internal fun forceOriginalAudioPatch(
                 val rawTracks = trackArrayField.get(audioVideoFormat) as? Array<*> ?: return@before
                 if (rawTracks.isEmpty() || rawTracks.any { it == null }) return@before
 
-                val tracks = Array(rawTracks.size) { index ->
-                    val record = rawTracks[index]!!
-                    object : ForceOriginalAudioPatch.AudioTrackInterface {
-                        override fun patch_getDisplayName(): String =
-                            displayNameField.get(record) as String
+                val tracks = if (previousRecords?.contentEquals(rawTracks) == true) {
+                    previousTracks ?: return@before
+                } else {
+                    Array(rawTracks.size) { index ->
+                        val record = rawTracks[index]!!
+                        object : ForceOriginalAudioPatch.AudioTrackInterface {
+                            override fun patch_getDisplayName(): String =
+                                displayNameField.get(record) as String
 
-                        override fun patch_getId(): String =
-                            idField.get(record) as String
+                            override fun patch_getId(): String =
+                                idField.get(record) as String
 
-                        override fun patch_getIsDefault(): Boolean =
-                            isDefaultField.getBoolean(record)
+                            override fun patch_getIsDefault(): Boolean =
+                                isDefaultField.getBoolean(record)
+                        }
+                    }.also {
+                        previousRecords = rawTracks.copyOf()
+                        previousTracks = it
                     }
                 }
 
