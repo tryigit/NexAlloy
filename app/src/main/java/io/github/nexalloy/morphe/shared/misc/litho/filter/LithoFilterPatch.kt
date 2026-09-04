@@ -78,9 +78,7 @@ internal fun sharedLithoFilterPatch(
     LithoFilterPatch::class.java.getDeclaredMethod("useLegacyLithoFiltering")
         .hookMethod(XC_MethodReplacement.returnConstant(useLegacyLithoFiltering()))
 
-    //region Pass the buffer into extension.
     if (hookNonNativeBuffer()) {
-        // Non-native buffer.
         ProtobufBufferReferenceFingerprint.hookMethod {
             before { param ->
                 LithoFilterPatch.setProtoBuffer(param.args[1] as ByteBuffer)
@@ -88,16 +86,13 @@ internal fun sharedLithoFilterPatch(
         }
     }
 
-    //endregion
-
-    // region Hook the method that parses bytes into a ComponentContext.
-
-    // Return an EmptyComponent instead of the original component if the filterState method returns true.
-
-    val buttonViewModelThreadLocal = ThreadLocal<Any?>()
+    val buttonViewModelFrames = ThreadLocal<MutableList<Any?>>()
     ComponentCreateFingerprint.hookMethod(scopedHook(::buttonViewModelReceiver.method) {
         before {
-            buttonViewModelThreadLocal.set(it.args[0])
+            val frames = buttonViewModelFrames.get() ?: return@before
+            if (frames.isNotEmpty()) {
+                frames[frames.lastIndex] = it.args[0]
+            }
         }
     })
 
@@ -110,13 +105,25 @@ internal fun sharedLithoFilterPatch(
         val protoBufferEncodeClass = ProtobufBufferEncodeFingerprint.declaredClass
         val accessibilityIdMethod = ::AccessibilityIdMethod.method
         val accessibilityTextMethod = ::accessibilityTextMethod.method
+        before {
+            val frames = buttonViewModelFrames.get()
+                ?: mutableListOf<Any?>().also(buttonViewModelFrames::set)
+            frames.add(null)
+        }
         after { param ->
-            val buttonViewModel = buttonViewModelThreadLocal.get()
-            buttonViewModelThreadLocal.remove()
+            val frames = buttonViewModelFrames.get()
+            val buttonViewModel = if (!frames.isNullOrEmpty()) {
+                frames.removeAt(frames.lastIndex)
+            } else {
+                null
+            }
+            if (frames.isNullOrEmpty()) {
+                buttonViewModelFrames.remove()
+            }
+            if (param.hasThrowable()) return@after
 
             val conversion = param.args[1]
             val bufferParent = param.args[2]
-            // Verify it's the expected subclass just in case.
             val buffer = if (protoBufferEncodeClass.isInstance(bufferParent)) {
                 protoBufferEncodeMethod.invoke(bufferParent) as ByteArray?
             } else byteArrayOf()
@@ -136,10 +143,6 @@ internal fun sharedLithoFilterPatch(
         }
     }
 
-    //endregion
-
-    // region Change Litho thread executor to 1 thread to fix layout issue in unpatched YouTube.
-
     ::lithoThreadExecutorFingerprint.hookMethod {
         before {
             it.args[0] = LithoFilterPatch.getExecutorCorePoolSize(it.args[0] as Int)
@@ -147,16 +150,7 @@ internal fun sharedLithoFilterPatch(
         }
     }
 
-    // endregion
-
-    // region A/B test of new Litho native code.
-
-    // Turn off a feature flag that enables native code of protobuf parsing (Upb protobuf).
-    // If this is enabled, then the litho protobuffer hook will always show an empty buffer
-    // since it's no longer handled by the hooked Java code.
     if (overrideUpbFeatureFlag()) {
         insertLiteralOverride(45419603L)
     }
-
-    // endregion
 }
