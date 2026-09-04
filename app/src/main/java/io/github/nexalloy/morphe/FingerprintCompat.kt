@@ -91,7 +91,7 @@ fun MethodMatcher.opcodes(opcodes: Collection<Opcode>): OpCodesMatcher {
 
 fun MethodMatcher.accessFlags(vararg accessFlags: AccessFlags) {
     val modifiers = accessFlags.fold(0) { acc, next -> acc or next.modifier }
-    this.modifiers(modifiers, MatchType.Equals)
+    if (modifiers != 0) this.modifiers(modifiers, MatchType.Equals)
     if (accessFlags.contains(AccessFlags.CONSTRUCTOR)) {
         if (accessFlags.contains(AccessFlags.STATIC)) this.name = "<clinit>"
         else this.name = "<init>"
