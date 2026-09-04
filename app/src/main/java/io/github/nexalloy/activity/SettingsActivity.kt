@@ -43,7 +43,8 @@ class SettingsActivity : Activity(), SettingApplication.ServiceStateListener {
         setContentView(R.layout.activity_settings)
         actionBar?.setDisplayShowHomeEnabled(true)
 
-        Utils.setContext(this)
+        Utils.setContext(applicationContext)
+        Utils.setActivity(this)
         aboutPreference = MorpheAboutPreference(this).apply {
             setTitle(R.string.about_title)
         }
@@ -173,7 +174,7 @@ class SettingsActivity : Activity(), SettingApplication.ServiceStateListener {
                 rootScreen.addPreference(this)
             }
 
-            Utils.setContext(context)
+            Utils.setContext(context.applicationContext)
 
             Preference(context).apply {
                 summary =
