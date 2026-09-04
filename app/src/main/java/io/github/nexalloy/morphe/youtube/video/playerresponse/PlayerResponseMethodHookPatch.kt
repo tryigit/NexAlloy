@@ -2,17 +2,47 @@ package io.github.nexalloy.morphe.youtube.video.playerresponse
 
 import io.github.nexalloy.patch
 
-private val beforeVideoIdHooks = linkedSetOf<Hook.ProtoBufferParameterBeforeVideoId>()
-private val videoIdHooks = linkedSetOf<Hook.VideoId>()
-private val playlistIdHooks = linkedSetOf<Hook.PlaylistId>()
-private val afterVideoIdHooks = linkedSetOf<Hook.ProtoBufferParameter>()
+@Volatile
+private var beforeVideoIdHooks = emptyArray<Hook.ProtoBufferParameterBeforeVideoId>()
+
+@Volatile
+private var videoIdHooks = emptyArray<Hook.VideoId>()
+
+@Volatile
+private var playlistIdHooks = emptyArray<Hook.PlaylistId>()
+
+@Volatile
+private var afterVideoIdHooks = emptyArray<Hook.ProtoBufferParameter>()
+
+private val hookRegistrationLock = Any()
 
 fun addPlayerResponseMethodHook(hook: Hook<*>) {
-    when (hook) {
-        is Hook.ProtoBufferParameterBeforeVideoId -> beforeVideoIdHooks += hook
-        is Hook.VideoId -> videoIdHooks += hook
-        is Hook.PlaylistId -> playlistIdHooks += hook
-        is Hook.ProtoBufferParameter -> afterVideoIdHooks += hook
+    synchronized(hookRegistrationLock) {
+        when (hook) {
+            is Hook.ProtoBufferParameterBeforeVideoId -> {
+                if (beforeVideoIdHooks.none { it === hook }) {
+                    beforeVideoIdHooks = beforeVideoIdHooks + hook
+                }
+            }
+
+            is Hook.VideoId -> {
+                if (videoIdHooks.none { it === hook }) {
+                    videoIdHooks = videoIdHooks + hook
+                }
+            }
+
+            is Hook.PlaylistId -> {
+                if (playlistIdHooks.none { it === hook }) {
+                    playlistIdHooks = playlistIdHooks + hook
+                }
+            }
+
+            is Hook.ProtoBufferParameter -> {
+                if (afterVideoIdHooks.none { it === hook }) {
+                    afterVideoIdHooks = afterVideoIdHooks + hook
+                }
+            }
+        }
     }
 }
 
@@ -37,17 +67,22 @@ val PlayerResponseMethodHook = patch {
             val isShortAndOpeningOrPlaying =
                 param.args[parameterIsShortAndOpeningOrPlaying] as Boolean
 
-            beforeVideoIdHooks.forEach {
-                protobuf = it(protobuf, videoId, isShortAndOpeningOrPlaying)
+            val beforeHooks = beforeVideoIdHooks
+            val currentVideoIdHooks = videoIdHooks
+            val currentPlaylistIdHooks = playlistIdHooks
+            val afterHooks = afterVideoIdHooks
+
+            for (hook in beforeHooks) {
+                protobuf = hook(protobuf, videoId, isShortAndOpeningOrPlaying)
             }
-            videoIdHooks.forEach {
-                it(videoId, isShortAndOpeningOrPlaying)
+            for (hook in currentVideoIdHooks) {
+                hook(videoId, isShortAndOpeningOrPlaying)
             }
-            playlistIdHooks.forEach {
-                it(playlistId, isShortAndOpeningOrPlaying)
+            for (hook in currentPlaylistIdHooks) {
+                hook(playlistId, isShortAndOpeningOrPlaying)
             }
-            afterVideoIdHooks.forEach {
-                protobuf = it(protobuf, videoId, isShortAndOpeningOrPlaying)
+            for (hook in afterHooks) {
+                protobuf = hook(protobuf, videoId, isShortAndOpeningOrPlaying)
             }
             param.args[PARAMETER_PROTO_BUFFER] = protobuf
         }
