@@ -27,7 +27,14 @@ val DisableShortsResumingOnStartup = patch(
                 }
             })
     } else {
-        // TODO
+        UserWasInShortsListenerFingerprint.hookMethod(
+            scopedHook(::userWasInShortsBooleanValueMethod.member) {
+                after {
+                    it.result =
+                        DisableShortsResumingOnStartupPatch.disableShortsResumingOnStartup(it.result as Boolean)
+                }
+            }
+        )
     }
 
     insertLiteralOverride(
