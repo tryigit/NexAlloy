@@ -69,4 +69,24 @@ class CoreInvariantTest {
         assertFalse(location.indexIsValidForMatching(-1, 5))
         assertTrue(location.indexIsValidForMatching(10, 13))
     }
+
+    @Test
+    fun smaliParsersSupportMultidimensionalArrays() {
+        val method = methodCall("Lx;->m([[I[[Ljava/lang/String;)[[[D")
+        assertEquals(listOf("[[I", "[[Ljava/lang/String;"), method.parameters)
+        assertEquals("[[[D", method.returnType)
+
+        val field = fieldAccess("Lx;->f:[[Ljava/lang/String;")
+        assertEquals("[[Ljava/lang/String;", field.type)
+    }
+
+    @Test
+    fun smaliParsersRejectVoidOutsideReturnType() {
+        assertThrows(IllegalArgumentException::class.java) {
+            methodCall("Lx;->m(V)V")
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            fieldAccess("Lx;->f:V")
+        }
+    }
 }
