@@ -113,9 +113,11 @@ val HideAds = patch(
         })
 
     // Hide paid promotion label in miniplayer
+    val miniplayerSubtitleId = ResourceUtils.getIdIdentifier("modern_miniplayer_subtitle_text")
     MiniplayerPaidPromotionLabelFingerprint.hookMethod(
         scopedHook(::miniplayerPaidPromotionViewMethod.member) {
             after { param ->
+                if (param.args[0] != miniplayerSubtitleId) return@after
                 (param.result as? View)?.let(AdsFilter::hideMiniplayerPaidPromotionLabelView)
             }
         }
