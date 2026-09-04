@@ -198,6 +198,14 @@ class CoreInvariantTest {
         assertThrows(IllegalArgumentException::class.java) {
             methodCall("Lx;->m($tooManySlots)V")
         }
+
+        val validConstructorSlots = "J".repeat(127)
+        methodCall("Lx;-><init>($validConstructorSlots)V")
+
+        val tooManyConstructorSlots = validConstructorSlots + "I"
+        assertThrows(IllegalArgumentException::class.java) {
+            methodCall("Lx;-><init>($tooManyConstructorSlots)V")
+        }
     }
 
     @Test
