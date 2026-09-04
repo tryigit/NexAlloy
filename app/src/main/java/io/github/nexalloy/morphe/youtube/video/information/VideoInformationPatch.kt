@@ -19,6 +19,7 @@ import io.github.nexalloy.morphe.youtube.video.playerresponse.Hook
 import io.github.nexalloy.morphe.youtube.video.playerresponse.PlayerResponseMethodHook
 import io.github.nexalloy.morphe.youtube.video.playerresponse.addPlayerResponseMethodHook
 import io.github.nexalloy.morphe.youtube.video.videoid.VideoId
+import io.github.nexalloy.morphe.youtube.video.videoid.hookBackgroundPlayVideoId
 import io.github.nexalloy.morphe.youtube.video.videoid.hookPlayerResponseVideoId
 import io.github.nexalloy.morphe.youtube.video.videoid.videoIdHooks
 import io.github.nexalloy.new
@@ -171,6 +172,7 @@ val VideoInformationPatch = patch(
      * Inject call for video ids
      */
     videoIdHooks.add { VideoInformation.setVideoId(it) }
+    hookBackgroundPlayVideoId(VideoInformation::setVideoId)
     // rvxp: currently this is only used for ReloadVideoButtonPatch
 //    hookPlayerResponsePlaylistId(VideoInformation::setPlayerResponsePlaylistId)
     hookPlayerResponseVideoId(VideoInformation::setPlayerResponseVideoId)
