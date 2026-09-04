@@ -56,11 +56,14 @@ class CoreInvariantTest {
     }
 
     @Test
-    fun wildcardArrayTypesSkipOnlyTheDexKitPrefilter() {
+    fun partialTypesSkipOnlyTheDexKitPrefilter() {
         assertNull(getTypeNameCompat("["))
         assertNull(getTypeNameCompat("[["))
         assertNull(getTypeNameCompat("[L"))
+        assertNull(getTypeNameCompat("String;"))
+        assertNull(getTypeNameCompat("java/lang"))
         assertEquals("int[]", getTypeNameCompat("[I"))
+        assertEquals("java.lang.String", getTypeNameCompat("Ljava/lang/String;"))
         assertEquals("java.lang.String[][]", getTypeNameCompat("[[Ljava/lang/String;"))
     }
 
