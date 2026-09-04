@@ -2,16 +2,35 @@ package io.github.nexalloy.morphe.youtube.layout.hide.general
 
 import io.github.nexalloy.morphe.AccessFlags
 import io.github.nexalloy.morphe.Fingerprint
+import io.github.nexalloy.morphe.InstructionLocation.MatchAfterImmediately
+import io.github.nexalloy.morphe.InstructionLocation.MatchAfterWithin
+import io.github.nexalloy.morphe.Opcode
 import io.github.nexalloy.morphe.StringComparisonType
 import io.github.nexalloy.morphe.findMethodDirect
+import io.github.nexalloy.morphe.methodCall
+import io.github.nexalloy.morphe.opcode
 import io.github.nexalloy.morphe.string
 
 internal object ParseElementFromBufferFingerprint : Fingerprint(
     parameters = listOf("L", "L", "[B", "L", "L"),
     filters = listOf(
+        opcode(Opcode.IGET_OBJECT),
+        // IGET_BOOLEAN // 20.07+
+        opcode(Opcode.INVOKE_INTERFACE, location = MatchAfterWithin(1)),
+        opcode(Opcode.MOVE_RESULT_OBJECT, location = MatchAfterImmediately()),
         string("Failed to parse Element", StringComparisonType.STARTS_WITH),
+        methodCall(
+            opcode = Opcode.INVOKE_STATIC,
+            parameters = listOf("L"),
+            returnType = "L"
+        ),
+        opcode(Opcode.RETURN_OBJECT, location = MatchAfterWithin(4))
     ),
 )
+
+val parseElementEmptyReturnMethod = findMethodDirect {
+    ParseElementFromBufferFingerprint.instructionMatches[4].instruction.methodRef!!
+}
 
 private object PlayerOverlayFingerprint : Fingerprint(
     accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.FINAL),
