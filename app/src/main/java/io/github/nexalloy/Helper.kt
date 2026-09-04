@@ -16,6 +16,7 @@ import java.io.File
 import java.lang.ref.WeakReference
 import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Member
+import java.lang.reflect.Method
 import java.util.ArrayDeque
 import java.util.WeakHashMap
 
@@ -106,7 +107,7 @@ internal class ScopedHookStateStack<T : Any> {
     private val frames = ThreadLocal<ArrayDeque<Frame<T>>>()
 
     fun push(outerParam: T) {
-        val stack = frames.get() ?: ArrayDeque<Frame<T>>().also(frames::set)
+        val stack = frames.get() ?: ArrayDeque<Frame<T>>>().also(frames::set)
         stack.addLast(Frame(outerParam))
     }
 
@@ -202,6 +203,19 @@ fun Context.addModuleAssets() {
     resources.assets.callMethod("addAssetPath", modulePath)
 }
 
+internal fun invokeFindClass(method: Method, loader: ClassLoader, name: String): Class<*> {
+    try {
+        return method(loader, name) as Class<*>
+    } catch (exception: InvocationTargetException) {
+        when (val cause = exception.cause) {
+            is ClassNotFoundException -> throw cause
+            is RuntimeException -> throw cause
+            is Error -> throw cause
+            else -> throw exception
+        }
+    }
+}
+
 // Module layouts (e.g. morphe_sb_inline_sponsor_overlay.xml) reference module classes
 // (app.morphe.*) via class attributes. When the host app inflates these layouts, its
 // ClassLoader cannot find those classes.
@@ -215,10 +229,10 @@ fun injectSelfClassLoaderToHost(self: ClassLoader, host: ClassLoader) {
         override fun findClass(name: String): Class<*> {
             try {
                 if (name.startsWith("app.morphe")) {
-                    return findClassMethod(self, name) as Class<*>
+                    return invokeFindClass(findClassMethod, self, name)
                 }
             } catch (_: ClassNotFoundException) {
-                Logger.printException { "Unexcepted ClassNotFoundException: $name" }
+                Logger.printException { "Unexpected ClassNotFoundException: $name" }
             }
 
             throw ClassNotFoundException(name)
@@ -257,8 +271,8 @@ fun injectHostClassLoaderToSelf(self: ClassLoader, host: ClassLoader) {
          */
         override fun findClass(name: String): Class<*> {
             try {
-                return findClassMethod(self, name) as Class<*>
-            } catch (_: InvocationTargetException) {
+                return invokeFindClass(findClassMethod, self, name)
+            } catch (_: ClassNotFoundException) {
             }
 
             try {
