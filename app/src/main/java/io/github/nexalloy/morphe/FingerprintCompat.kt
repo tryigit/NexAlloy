@@ -15,6 +15,7 @@ import org.luckypray.dexkit.util.DexSignUtil.getTypeName
 fun getTypeNameCompat(it: String): String? {
     return when {
         it == "this" -> null
+        it.isNotEmpty() && it.all { char -> char == '[' } -> null
         it.trimStart('[').startsWith('L') && !it.endsWith(';') -> null
         else -> getTypeName(it)
     }
