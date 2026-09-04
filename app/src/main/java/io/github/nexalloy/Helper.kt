@@ -143,10 +143,10 @@ inline fun scopedHook(
 class ScopedHook : XC_MethodHook() {
     private val state = ScopedHookStateStack<MethodHookParam>()
 
-    inline fun hookInnerMethod(
+    fun hookInnerMethod(
         hookMethod: Member,
-        crossinline before: IScopedHookCallback,
-        crossinline after: IScopedHookCallback
+        before: IScopedHookCallback,
+        after: IScopedHookCallback
     ) {
         hookMethod.hookMethod {
             before {
