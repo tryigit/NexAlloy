@@ -8,6 +8,7 @@ import io.github.nexalloy.morphe.music.misc.settings.PreferenceScreen
 import io.github.nexalloy.morphe.shared.ad.HideFullscreenAds
 import io.github.nexalloy.morphe.shared.misc.settings.preference.SwitchPreference
 import io.github.nexalloy.patch
+import io.github.nexalloy.scopedHook
 
 val HideAds = patch(
     name = "Hide ads",
@@ -19,7 +20,7 @@ val HideAds = patch(
 
     PreferenceScreen.ADS.addPreferences(
         SwitchPreference("morphe_music_hide_get_premium_label"),
-//        SwitchPreference("morphe_music_hide_music_premium_promotions"),
+        SwitchPreference("morphe_music_hide_music_premium_promotions"),
         SwitchPreference("morphe_music_hide_video_ads"),
     )
 
@@ -51,5 +52,11 @@ val HideAds = patch(
         }
     }
 
-    // TODO Hide Music Premium promotions
+    FloatingLayoutFingerprint.hookMethod(
+        scopedHook(::floatingLayoutFindViewById.member) {
+            after { param ->
+                (param.result as? View)?.let(HideAdsPatch::hidePremiumPromotionBottomSheet)
+            }
+        }
+    )
 }
