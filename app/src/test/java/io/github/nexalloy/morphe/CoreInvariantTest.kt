@@ -1,8 +1,11 @@
 package io.github.nexalloy.morphe
 
 import io.github.nexalloy.AppVersion
+import io.github.nexalloy.decodeCacheStringList
+import io.github.nexalloy.encodeCacheStringList
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -100,5 +103,27 @@ class CoreInvariantTest {
         assertThrows(IllegalArgumentException::class.java) {
             methodCall("Lx;->m([L;)V")
         }
+    }
+
+    @Test
+    fun cacheStringListsRoundTripLosslessly() {
+        val cases = listOf(
+            emptyList(),
+            listOf(""),
+            listOf("a|b", "c:d", "", "\u2603"),
+            listOf("list-v1:5:hello")
+        )
+
+        cases.forEach { original ->
+            assertEquals(original, decodeCacheStringList(encodeCacheStringList(original)))
+        }
+    }
+
+    @Test
+    fun cacheStringListDecoderRejectsMalformedValues() {
+        assertNull(decodeCacheStringList("legacy|value"))
+        assertNull(decodeCacheStringList("list-v1:nope:value"))
+        assertNull(decodeCacheStringList("list-v1:10:short"))
+        assertNull(decodeCacheStringList("list-v1:-1:"))
     }
 }
