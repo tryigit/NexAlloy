@@ -192,6 +192,7 @@ class PatchExecutor(
 
     private lateinit var patches: Array<Patch>
     private val appliedPatches = mutableSetOf<Patch>()
+    private val failedPatchErrors = mutableMapOf<Patch, Throwable>()
     private val failedPatches = mutableListOf<Patch>()
 
     // cache
@@ -242,14 +243,19 @@ class PatchExecutor(
     private fun executePatches() {
         patches.forEach { hook ->
             if (appliedPatches.contains(hook)) return@forEach
+            if (failedPatchErrors.containsKey(hook)) {
+                if (!failedPatches.contains(hook)) failedPatches.add(hook)
+                return@forEach
+            }
             /**
              * @see io.github.nexalloy.activity.AppPatchSettingsActivity.AppPatchSettingsFragment.onCreate
              * */
             val isEnabled = patchPreferences?.getBoolean(hook.name, hook.use) ?: hook.use
             if (!isEnabled) return@forEach // Pref Key
             runCatching { hook.run(this) }.onFailure { err ->
+                failedPatchErrors[hook] = err
                 XposedBridge.log(err)
-                failedPatches.add(hook)
+                if (!failedPatches.contains(hook)) failedPatches.add(hook)
             }.onSuccess {
                 appliedPatches.add(hook)
             }
@@ -289,7 +295,11 @@ class PatchExecutor(
     fun dependsOn(vararg patches: Patch) {
         patches.forEach { hook ->
             if (appliedPatches.contains(hook)) return@forEach
-            runCatching { (hook.run(this)) }.onFailure { err ->
+            failedPatchErrors[hook]?.let { err ->
+                throw DependedHookFailedException(hook.name, err)
+            }
+            runCatching { hook.run(this) }.onFailure { err ->
+                failedPatchErrors[hook] = err
                 throw DependedHookFailedException(hook.name, err)
             }.onSuccess {
                 appliedPatches.add(hook)
