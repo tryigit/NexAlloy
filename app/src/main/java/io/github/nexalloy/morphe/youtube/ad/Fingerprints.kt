@@ -79,7 +79,13 @@ val PlayerOverlayIdField = findFieldDirect {
 internal object MiniplayerPaidPromotionLabelFingerprint : Fingerprint(
     filters = listOf(
         resourceLiteral(ResourceType.ID, "modern_miniplayer_subtitle_text"),
-        opcode(Opcode.INVOKE_VIRTUAL, MatchAfterImmediately()),
+        methodCall(
+            opcode = Opcode.INVOKE_VIRTUAL,
+            name = "findViewById",
+            parameters = listOf("I"),
+            returnType = "Landroid/view/View;",
+            location = MatchAfterImmediately(),
+        ),
         opcode(Opcode.MOVE_RESULT_OBJECT, MatchAfterImmediately())
     )
 )
