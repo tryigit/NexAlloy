@@ -11,9 +11,11 @@ import io.github.nexalloy.morphe.fieldAccess
 import io.github.nexalloy.morphe.findClassDirect
 import io.github.nexalloy.morphe.findFieldDirect
 import io.github.nexalloy.morphe.findMethodDirect
+import io.github.nexalloy.morphe.findMethodListDirect
 import io.github.nexalloy.morphe.methodCall
 import io.github.nexalloy.morphe.opcode
 import io.github.nexalloy.morphe.resourceLiteral
+import io.github.nexalloy.morphe.resourceMappings
 import io.github.nexalloy.morphe.string
 
 private val ADD_METHOD_CALL = methodCall(
@@ -96,6 +98,16 @@ internal object MiniplayerPaidPromotionLabelFingerprint : Fingerprint(
 
 val miniplayerPaidPromotionViewMethod = findMethodDirect {
     MiniplayerPaidPromotionLabelFingerprint.instructionMatches[1].instruction.methodRef!!
+}
+
+val adAttributionId get() = resourceMappings["id", "ad_attribution"]
+
+val adAttributionMethods = findMethodListDirect {
+    findMethod {
+        matcher {
+            addUsingNumber(adAttributionId)
+        }
+    }
 }
 
 internal object LoadVideoAdsFingerprint : Fingerprint(
