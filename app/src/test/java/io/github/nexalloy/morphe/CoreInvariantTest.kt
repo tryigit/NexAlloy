@@ -106,6 +106,63 @@ class CoreInvariantTest {
     }
 
     @Test
+    fun smaliParsersValidateJvmNames() {
+        listOf(
+            "L/foo;->m()V",
+            "Lfoo/;->m()V",
+            "Lfoo//bar;->m()V",
+            "Lfoo.bar;->m()V",
+            "Lfoo;->bad/name()V",
+            "Lfoo;->bad.name()V",
+            "Lfoo;->bad[method()V",
+            "Lfoo;-><bad>()V",
+            "Lfoo;->m(Ljava//lang/String;)V"
+        ).forEach { signature ->
+            assertThrows(IllegalArgumentException::class.java) {
+                methodCall(signature)
+            }
+        }
+
+        methodCall("Lfoo;-><init>()V")
+        methodCall("Lfoo;-><clinit>()V")
+
+        listOf(
+            "L/foo;->f:I",
+            "Lfoo//bar;->f:I",
+            "Lfoo;->bad/name:I",
+            "Lfoo;->bad.name:I",
+            "Lfoo;->bad[field:I",
+            "Lfoo;->f:Ljava//lang/String;"
+        ).forEach { signature ->
+            assertThrows(IllegalArgumentException::class.java) {
+                fieldAccess(signature)
+            }
+        }
+    }
+
+    @Test
+    fun smaliParsersEnforceJvmDescriptorLimits() {
+        val tooDeepArray = "[".repeat(256) + "I"
+        assertThrows(IllegalArgumentException::class.java) {
+            methodCall("Lx;->m($tooDeepArray)V")
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            methodCall("Lx;->m()$tooDeepArray")
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            fieldAccess("Lx;->f:$tooDeepArray")
+        }
+
+        val validSlots = "J".repeat(127) + "I"
+        methodCall("Lx;->m($validSlots)V")
+
+        val tooManySlots = "J".repeat(128)
+        assertThrows(IllegalArgumentException::class.java) {
+            methodCall("Lx;->m($tooManySlots)V")
+        }
+    }
+
+    @Test
     fun cacheStringListsRoundTripLosslessly() {
         val cases = listOf(
             emptyList(),
