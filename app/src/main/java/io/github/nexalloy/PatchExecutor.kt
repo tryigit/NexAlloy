@@ -32,6 +32,7 @@ import org.luckypray.dexkit.wrap.DexMethod
 import java.lang.reflect.Constructor
 import java.lang.reflect.Member
 import java.lang.reflect.Method
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.reflect.KProperty0
 import kotlin.system.measureTimeMillis
 
@@ -99,32 +100,62 @@ abstract class IHook(val xposed: XposedInterface) : XposedInterface by xposed {
     override fun getApiVersion(): Int = xposed.apiVersion
 }
 
-@Suppress("UNCHECKED_CAST")
+private const val CACHE_LIST_PREFIX = "list-v1:"
+
+internal fun encodeCacheStringList(value: List<String>): String = buildString {
+    append(CACHE_LIST_PREFIX)
+    value.forEach { item ->
+        append(item.length)
+        append(':')
+        append(item)
+    }
+}
+
+internal fun decodeCacheStringList(value: String): List<String>? {
+    if (!value.startsWith(CACHE_LIST_PREFIX)) return null
+
+    val result = mutableListOf<String>()
+    var index = CACHE_LIST_PREFIX.length
+    while (index < value.length) {
+        val separator = value.indexOf(':', index)
+        if (separator < 0) return null
+        val length = value.substring(index, separator).toIntOrNull() ?: return null
+        if (length < 0) return null
+        val itemStart = separator + 1
+        if (length > value.length - itemStart) return null
+        val itemEnd = itemStart + length
+        result += value.substring(itemStart, itemEnd)
+        index = itemEnd
+    }
+    return result
+}
+
 class SharedPrefCache(app: Application) : DexKitCacheBridge.Cache {
     val pref = app.getSharedPreferences("xpmorphe", MODE_PRIVATE)!!
-    private val map = mutableMapOf<String, String>().apply {
-        putAll(pref.all as Map<String, String>)
+    private val map = ConcurrentHashMap<String, String>().apply {
+        pref.all.forEach { (key, value) ->
+            if (value is String) put(key, value)
+        }
     }
 
     override fun clearAll() {
         map.clear()
     }
 
-    override fun getString(key: String, default: String?): String? = map.getOrDefault(key, default)
+    override fun getString(key: String, default: String?): String? = map[key] ?: default
 
-    override fun getAllKeys(): Collection<String> = map.keys
+    override fun getAllKeys(): Collection<String> = map.keys.toList()
 
     override fun getStringList(
         key: String, default: List<String>?
-    ): List<String>? =
-        map.getOrDefault(key, null)?.takeIf(String::isNotBlank)?.split('|') ?: default
+    ): List<String>? = map[key]?.let(::decodeCacheStringList) ?: default
 
     override fun putString(key: String, value: String) {
-        map.put(key, value)
+        map[key] = value
     }
 
     override fun putStringList(key: String, value: List<String>) {
-        map.put(key, value.joinToString("|"))
+        map[key] = encodeCacheStringList(value)
     }
 
     override fun remove(key: String) {
@@ -132,9 +163,10 @@ class SharedPrefCache(app: Application) : DexKitCacheBridge.Cache {
     }
 
     fun saveCache() {
+        val snapshot = map.toMap()
         val edit = pref.edit()
         edit.clear()
-        map.forEach { (k, v) ->
+        snapshot.forEach { (k, v) ->
             edit.putString(k, v)
         }
         edit.commit()
