@@ -10,6 +10,15 @@ import io.github.nexalloy.morphe.shared.ad.HideFullscreenAds
 import io.github.nexalloy.morphe.shared.misc.litho.filter.addLithoFilter
 import io.github.nexalloy.morphe.shared.misc.settings.preference.SwitchPreference
 import io.github.nexalloy.morphe.youtube.layout.hide.general.HideHorizontalShelves
+import io.github.nexalloy.morphe.youtube.misc.contexthook.ClientContextEndpoint.BROWSE
+import io.github.nexalloy.morphe.youtube.misc.contexthook.ClientContextEndpoint.GET_WATCH
+import io.github.nexalloy.morphe.youtube.misc.contexthook.ClientContextEndpoint.GUIDE
+import io.github.nexalloy.morphe.youtube.misc.contexthook.ClientContextEndpoint.NEXT
+import io.github.nexalloy.morphe.youtube.misc.contexthook.ClientContextEndpoint.PLAYER
+import io.github.nexalloy.morphe.youtube.misc.contexthook.ClientContextEndpoint.REEL
+import io.github.nexalloy.morphe.youtube.misc.contexthook.ClientContextEndpoint.SEARCH
+import io.github.nexalloy.morphe.youtube.misc.contexthook.ClientContextHook
+import io.github.nexalloy.morphe.youtube.misc.contexthook.addOSNameHook
 import io.github.nexalloy.morphe.youtube.misc.engagement.EngagementPanelHook
 import io.github.nexalloy.morphe.youtube.misc.engagement.addEngagementPanelIdHook
 import io.github.nexalloy.morphe.youtube.misc.litho.filter.LithoFilter
@@ -28,6 +37,7 @@ val HideAds = patch(
         HideHorizontalShelves,
         HideFullscreenAds(PreferenceScreen.ADS),
         VersionCheck,
+        ClientContextHook,
     )
 
     PreferenceScreen.ADS.addPreferences(
@@ -45,6 +55,14 @@ val HideAds = patch(
 
     addLithoFilter(AdsFilter())
     addEngagementPanelIdHook(AdsFilter::hidePlayerPopupAds)
+
+    listOf(BROWSE, SEARCH, NEXT).forEach { endpoint ->
+        addOSNameHook(endpoint, AdsFilter::hideAds)
+    }
+    listOf(GET_WATCH, PLAYER, REEL).forEach { endpoint ->
+        addOSNameHook(endpoint, AdsFilter::hideVideoAds)
+    }
+    addOSNameHook(GUIDE, AdsFilter::overrideGuideOSName)
 
     setOf(
         LoadVideoAdsFingerprint,
