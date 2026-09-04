@@ -6,7 +6,6 @@ import io.github.nexalloy.morphe.InstructionLocation.MatchAfterImmediately
 import io.github.nexalloy.morphe.InstructionLocation.MatchAfterWithin
 import io.github.nexalloy.morphe.Opcode
 import io.github.nexalloy.morphe.ResourceType
-import io.github.nexalloy.morphe.fieldAccess
 import io.github.nexalloy.morphe.findFieldDirect
 import io.github.nexalloy.morphe.findMethodDirect
 import io.github.nexalloy.morphe.methodCall
@@ -72,20 +71,11 @@ internal object AdProgressTextViewVisibilityFingerprint : Fingerprint(
     returnType = "V",
     parameters = listOf("Z"),
     filters = listOf(
-        fieldAccess(
-            opcode = Opcode.IGET_OBJECT,
-            type = "Ljava/lang/Object;"
-        ),
-        opcode(opcode = Opcode.CHECK_CAST, location = MatchAfterWithin(4)),
-    ),
-    custom = {
-        addInvoke {
-            descriptor =
-                "Lcom/google/android/libraries/youtube/ads/player/ui/AdProgressTextView;->setVisibility(I)V"
-        }
-    }
+        methodCall(
+            definingClass = "Lcom/google/android/libraries/youtube/ads/player/ui/AdProgressTextView;",
+            name = "setVisibility",
+            parameters = listOf("I"),
+            returnType = "V"
+        )
+    )
 )
-
-val AdProgressTextField = findFieldDirect {
-    AdProgressTextViewVisibilityFingerprint.instructionMatches[0].instruction.fieldRef!!
-}
