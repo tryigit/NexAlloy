@@ -41,6 +41,10 @@ internal object FullScreenEngagementAdContainerFingerprint : Fingerprint(
     )
 )
 
+val fullScreenEngagementAdAddMethod = findMethodDirect {
+    FullScreenEngagementAdContainerFingerprint.instructionMatches[3].instruction.methodRef!!
+}
+
 internal object GetPremiumViewFingerprint : Fingerprint(
     definingClass = "Lcom/google/android/apps/youtube/app/red/presenter/CompactYpcOfferModuleView;",
     name = "onMeasure",
