@@ -47,7 +47,7 @@ jobs:
     - run: |
         cd app/build/outputs/apk/release/
         mv app-release.apk "NexAlloy-${RELEASE_REF}.apk"
-        gh release create "$RELEASE_REF" "NexAlloy-${RELEASE_REF}.apk"
+        gh release create "$RELEASE_REF" "NexAlloy-${RELEASE_REF}.apk" --prerelease
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         RELEASE_REF: ${{ github.ref_name }}
