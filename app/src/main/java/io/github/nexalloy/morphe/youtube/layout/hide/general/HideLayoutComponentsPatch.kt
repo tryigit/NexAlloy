@@ -270,7 +270,7 @@ val HideLayoutComponents = patch(
                     preferences = setOf(
                         NonInteractivePreference(
                             key = "morphe_hide_aislist_about",
-                            titleKey = "morphe_hide_aislist_about_title",
+                            titleKey = "morphe_hide_aislist_screen_title",
                             tag = BulletPointPreference::class.java
                         ),
                         NonInteractivePreference(
