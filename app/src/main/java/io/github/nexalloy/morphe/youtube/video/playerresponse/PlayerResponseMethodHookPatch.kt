@@ -21,25 +21,24 @@ val PlayerResponseMethodHook = patch {
         before { param ->
             val videoId = param.args[PARAMETER_VIDEO_ID] as String
             var protobuf = param.args[PARAMETER_PROTO_BUFFER] as String
-            var playlistId = param.args[PARAMETER_PLAYLIST_ID] as String?
+            val playlistId = param.args[PARAMETER_PLAYLIST_ID] as String?
             val isShortAndOpeningOrPlaying =
                 param.args[parameterIsShortAndOpeningOrPlaying] as Boolean
 
-            // Reverse the order in order to preserve insertion order of the hooks.
             val beforeVideoIdHooks =
-                hooks.filterIsInstance<Hook.ProtoBufferParameterBeforeVideoId>().asReversed()
-            val playlistIdHooks = hooks.filterIsInstance<Hook.PlaylistId>().asReversed()
-            val videoIdHooks = hooks.filterIsInstance<Hook.VideoId>().asReversed()
-            val afterVideoIdHooks = hooks.filterIsInstance<Hook.ProtoBufferParameter>().asReversed()
+                hooks.filterIsInstance<Hook.ProtoBufferParameterBeforeVideoId>()
+            val videoIdHooks = hooks.filterIsInstance<Hook.VideoId>()
+            val playlistIdHooks = hooks.filterIsInstance<Hook.PlaylistId>()
+            val afterVideoIdHooks = hooks.filterIsInstance<Hook.ProtoBufferParameter>()
 
             beforeVideoIdHooks.forEach {
                 protobuf = it(protobuf, videoId, isShortAndOpeningOrPlaying)
             }
-            playlistIdHooks.forEach {
-                it(playlistId, isShortAndOpeningOrPlaying)
-            }
             videoIdHooks.forEach {
                 it(videoId, isShortAndOpeningOrPlaying)
+            }
+            playlistIdHooks.forEach {
+                it(playlistId, isShortAndOpeningOrPlaying)
             }
             afterVideoIdHooks.forEach {
                 protobuf = it(protobuf, videoId, isShortAndOpeningOrPlaying)
