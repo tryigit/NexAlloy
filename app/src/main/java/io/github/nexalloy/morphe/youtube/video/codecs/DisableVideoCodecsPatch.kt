@@ -23,18 +23,24 @@ val DisableVideoCodecs = patch(
 
     val supportedHdrTypesMember =
         DexMethod($$"Landroid/view/Display$HdrCapabilities;->getSupportedHdrTypes()[I").toMember()
+    val hdrOverrideGuard = ThreadLocal<Boolean>()
 
     // Match upstream's call-site replacement rather than globally overriding every platform
-    // getSupportedHdrTypes() call in the process. The nested call made by
-    // overrideSupportedHdrTypes() itself is left untouched so the extension can read the
-    // original platform value.
+    // getSupportedHdrTypes() call in the process. The extension queries the platform method again
+    // to obtain its original value, so ignore that nested call while applying the override.
     ::HDRCapabilityFingerprint.dexMethodList.forEach { outerMethod ->
         outerMethod.hookMethod(scopedHook(supportedHdrTypesMember) {
             after { innerParam ->
-                if (innerDepth != 0) return@after
-                innerParam.result = DisableVideoCodecsPatch.overrideSupportedHdrTypes(
-                    innerParam.thisObject as Display.HdrCapabilities
-                )
+                if (innerDepth != 0 || hdrOverrideGuard.get() == true) return@after
+
+                hdrOverrideGuard.set(true)
+                try {
+                    innerParam.result = DisableVideoCodecsPatch.overrideSupportedHdrTypes(
+                        innerParam.thisObject as Display.HdrCapabilities
+                    )
+                } finally {
+                    hdrOverrideGuard.remove()
+                }
             }
         })
     }
