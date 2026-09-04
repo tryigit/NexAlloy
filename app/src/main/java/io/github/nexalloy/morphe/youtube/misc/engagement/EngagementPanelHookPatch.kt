@@ -1,6 +1,5 @@
 package io.github.nexalloy.morphe.youtube.misc.engagement
 
-
 import app.morphe.extension.youtube.shared.EngagementPanel
 import io.github.nexalloy.morphe.youtube.shared.EngagementPanelControllerFingerprint
 import io.github.nexalloy.patch
@@ -21,15 +20,18 @@ val EngagementPanelHook = patch(
     EngagementPanelControllerFingerprint.hookMethod {
         after { param ->
             val id = panelId.get()
-            engagementPanelIdHooks.forEach { hook ->
-                if (hook(id)) {
-                    param.result = null
-                    return@after
+            try {
+                engagementPanelIdHooks.forEach { hook ->
+                    if (hook(id)) {
+                        param.result = null
+                        return@after
+                    }
                 }
-            }
 
-            EngagementPanel.open(id)
-            panelId.remove()
+                EngagementPanel.open(id)
+            } finally {
+                panelId.remove()
+            }
         }
     }
 
