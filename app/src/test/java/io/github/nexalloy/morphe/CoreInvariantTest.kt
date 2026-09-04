@@ -56,6 +56,15 @@ class CoreInvariantTest {
     }
 
     @Test
+    fun wildcardArrayTypesSkipOnlyTheDexKitPrefilter() {
+        assertNull(getTypeNameCompat("["))
+        assertNull(getTypeNameCompat("[["))
+        assertNull(getTypeNameCompat("[L"))
+        assertEquals("int[]", getTypeNameCompat("[I"))
+        assertEquals("java.lang.String[][]", getTypeNameCompat("[[Ljava/lang/String;"))
+    }
+
+    @Test
     fun matchFirstOnlyAcceptsMethodStart() {
         val location = InstructionLocation.MatchFirst()
         assertTrue(location.indexIsValidForMatching(-1, 0))
