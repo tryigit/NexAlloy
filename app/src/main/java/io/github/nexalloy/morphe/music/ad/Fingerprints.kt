@@ -54,6 +54,7 @@ internal object FloatingLayoutFingerprint : Fingerprint(
         methodCall(
             opcode = Opcode.INVOKE_VIRTUAL,
             name = "findViewById",
+            parameters = listOf("I"),
             returnType = "Landroid/view/View;"
         ),
         opcode(
