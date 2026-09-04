@@ -42,29 +42,24 @@ internal val ClientContextHook = patch {
         osField.set(clientInfo, osName)
     }
 
-    ::browseRequestBodyMethod.hookMethod {
-        after { applyHooks(it.thisObject, ClientContextEndpoint.BROWSE) }
-    }
-    ::guideRequestBodyMethod.hookMethod {
-        after { applyHooks(it.thisObject, ClientContextEndpoint.GUIDE) }
-    }
-    ::nextRequestBodyMethod.hookMethod {
-        after { applyHooks(it.thisObject, ClientContextEndpoint.NEXT) }
-    }
-    ::playerRequestBodyMethod.hookMethod {
-        after { applyHooks(it.thisObject, ClientContextEndpoint.PLAYER) }
-    }
-    ::searchRequestBodyMethod.hookMethod {
-        after { applyHooks(it.thisObject, ClientContextEndpoint.SEARCH) }
-    }
-    ::getWatchRequestBodyMethods.dexMethodList.forEach { method ->
+    fun hook(method: java.lang.reflect.Member, endpoint: ClientContextEndpoint) {
         method.hookMethod {
-            after { applyHooks(it.thisObject, ClientContextEndpoint.GET_WATCH) }
+            after {
+                if (it.hasThrowable()) return@after
+                applyHooks(it.thisObject, endpoint)
+            }
         }
+    }
+
+    hook(::browseRequestBodyMethod.member, ClientContextEndpoint.BROWSE)
+    hook(::guideRequestBodyMethod.member, ClientContextEndpoint.GUIDE)
+    hook(::nextRequestBodyMethod.member, ClientContextEndpoint.NEXT)
+    hook(::playerRequestBodyMethod.member, ClientContextEndpoint.PLAYER)
+    hook(::searchRequestBodyMethod.member, ClientContextEndpoint.SEARCH)
+    ::getWatchRequestBodyMethods.dexMethodList.forEach { method ->
+        hook(method.toMember(), ClientContextEndpoint.GET_WATCH)
     }
     ::reelRequestBodyMethods.dexMethodList.forEach { method ->
-        method.hookMethod {
-            after { applyHooks(it.thisObject, ClientContextEndpoint.REEL) }
-        }
+        hook(method.toMember(), ClientContextEndpoint.REEL)
     }
 }
