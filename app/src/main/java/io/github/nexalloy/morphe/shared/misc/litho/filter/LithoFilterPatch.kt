@@ -8,7 +8,6 @@ import io.github.nexalloy.PatchExecutor
 import io.github.nexalloy.hookMethod
 import io.github.nexalloy.morphe.shared.misc.litho.context.ConversionContext
 import io.github.nexalloy.morphe.youtube.insertLiteralOverride
-import io.github.nexalloy.new
 import io.github.nexalloy.patch
 import io.github.nexalloy.scopedHook
 import java.nio.ByteBuffer
@@ -103,7 +102,10 @@ internal fun sharedLithoFilterPatch(
     })
 
     ComponentCreateFingerprint.hookMethod {
-        val emptyComponentClazz = ::emptyComponentClass.clazz
+        val emptyComponentBuilder = EmptyComponentBuilderFingerprint.method
+        val emptyComponentField = emptyComponentBuilder.returnType.declaredFields
+            .single()
+            .apply { isAccessible = true }
         val protoBufferEncodeMethod = ProtobufBufferEncodeFingerprint.method
         val protoBufferEncodeClass = ProtobufBufferEncodeFingerprint.declaredClass
         val accessibilityIdMethod = ::AccessibilityIdMethod.method
@@ -116,10 +118,10 @@ internal fun sharedLithoFilterPatch(
             val bufferParent = param.args[2]
             // Verify it's the expected subclass just in case.
             val buffer = if (protoBufferEncodeClass.isInstance(bufferParent)) {
-                protoBufferEncodeMethod(bufferParent) as ByteArray?
+                protoBufferEncodeMethod.invoke(bufferParent) as ByteArray?
             } else byteArrayOf()
-            val accessibilityId = buttonViewModel?.let { accessibilityIdMethod(it) as String? }
-            val accessibilityText = buttonViewModel?.let { accessibilityTextMethod(it) as String? }
+            val accessibilityId = buttonViewModel?.let { accessibilityIdMethod.invoke(it) as String? }
+            val accessibilityText = buttonViewModel?.let { accessibilityTextMethod.invoke(it) as String? }
 
             if (LithoFilterPatch.isFiltered(
                     ConversionContext(conversion),
@@ -128,7 +130,8 @@ internal fun sharedLithoFilterPatch(
                     accessibilityText
                 )
             ) {
-                param.result = emptyComponentClazz.new()
+                val emptyComponentBuilderResult = emptyComponentBuilder.invoke(null, param.args[0])
+                param.result = emptyComponentField.get(emptyComponentBuilderResult)
             }
         }
     }
