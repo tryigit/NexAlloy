@@ -32,6 +32,15 @@ internal object HideGetPremiumFingerprint : Fingerprint(
     strings = listOf("FEmusic_history", "FEmusic_offline")
 )
 
+val hideGetPremiumSetVisibility = findMethodDirect {
+    HideGetPremiumFingerprint().invokes.single {
+        it.className == "android.view.View" &&
+            it.name == "setVisibility" &&
+            it.paramTypeNames == listOf("int") &&
+            it.returnTypeName == "void"
+    }
+}
+
 internal object MembershipSettingsFingerprint : Fingerprint(
     accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.FINAL),
     returnType = "Ljava/lang/CharSequence;",
