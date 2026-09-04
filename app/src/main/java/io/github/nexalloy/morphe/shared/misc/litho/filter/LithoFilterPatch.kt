@@ -109,14 +109,15 @@ internal fun sharedLithoFilterPatch(
         val accessibilityIdMethod = ::AccessibilityIdMethod.method
         val accessibilityTextMethod = ::accessibilityTextMethod.method
         after { param ->
+            val buttonViewModel = buttonViewModelThreadLocal.get()
+            buttonViewModelThreadLocal.remove()
+
             val conversion = param.args[1]
             val bufferParent = param.args[2]
             // Verify it's the expected subclass just in case.
             val buffer = if (protoBufferEncodeClass.isInstance(bufferParent)) {
                 protoBufferEncodeMethod(bufferParent) as ByteArray?
             } else byteArrayOf()
-            val buttonViewModel = buttonViewModelThreadLocal.get()
-            buttonViewModelThreadLocal.remove()
             val accessibilityId = buttonViewModel?.let { accessibilityIdMethod(it) as String? }
             val accessibilityText = buttonViewModel?.let { accessibilityTextMethod(it) as String? }
 
