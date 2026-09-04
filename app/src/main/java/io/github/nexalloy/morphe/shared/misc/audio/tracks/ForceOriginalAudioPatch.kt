@@ -29,7 +29,8 @@ internal fun forceOriginalAudioPatch(
     preferenceScreen.addPreferences(
         SwitchPreference(
             key = "morphe_force_original_audio",
-            tag = ForceOriginalAudioSwitchPreference::class.java
+            tag = ForceOriginalAudioSwitchPreference::class.java,
+            summary = true
         )
     )
 
@@ -50,6 +51,21 @@ internal fun forceOriginalAudioPatch(
         }
     }
 
+    // Upstream invokes the app-specific subclass at the start of MainActivity.onCreate().
+    // This initializes the spoof-client locale workaround used by Force Original Audio.
+    val subclassExtensionClassName = subclassExtensionClassDescriptor
+        .removePrefix("L")
+        .removeSuffix(";")
+        .replace('/', '.')
+    val setEnabledMethod = classLoader
+        .loadClass(subclassExtensionClassName)
+        .getDeclaredMethod("setEnabled")
+    mainActivityOnCreateFingerprint.hookMethod {
+        before {
+            setEnabledMethod.invoke(null)
+        }
+    }
+
     // Disable feature flag that ignores the default track flag
     // and instead overrides to the user region language.
     if (fixUseLocalizedAudioTrackFlag()) {
@@ -65,7 +81,8 @@ internal fun forceOriginalAudioPatch(
     // Since mapping the proto field and finding the appropriate hooking point is very difficult,
     // 'Default audio track' patches has been implemented (like 'Default video quality' patches).
 
-    // TODO
+    // TODO Runtime port for the 21.26+ forced-SABR default-track selection path.
+    forcedServerAdaptiveStreaming()
 
     executeBlock()
 }
