@@ -4,7 +4,6 @@ import android.graphics.Canvas
 import android.graphics.Rect
 import android.os.Build
 import android.view.ViewGroup
-import android.widget.TextView
 import app.morphe.extension.shared.ResourceUtils
 import app.morphe.extension.shared.sponsorblock.objects.SegmentCategoryPreference
 import app.morphe.extension.shared.sponsorblock.ui.SponsorBlockAboutPreference
@@ -252,11 +251,13 @@ val SponsorBlock = patch(
         }
     })
 
-    AdProgressTextViewVisibilityFingerprint.hookMethod {
-        val adProgressTextField = ::AdProgressTextField.field
-        after {
-            val textView = adProgressTextField.get(it.thisObject) as TextView
-            YouTubeSponsorBlockConfig.setAdProgressTextVisibility(textView.visibility)
+    AdProgressTextViewVisibilityFingerprint.hookMethod(
+        scopedHook(
+            DexMethod("Lcom/google/android/libraries/youtube/ads/player/ui/AdProgressTextView;->setVisibility(I)V").toMember()
+        ) {
+            before { param ->
+                YouTubeSponsorBlockConfig.setAdProgressTextVisibility(param.args[0] as Int)
+            }
         }
-    }
+    )
 }
