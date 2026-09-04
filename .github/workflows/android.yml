@@ -93,11 +93,15 @@ jobs:
 
     - name: Create AutoBuild Release
       run: |
-        LATEST_REL=$(gh release view --json tagName -q .tagName)
+        LATEST_REL=$(gh release view --json tagName -q .tagName 2>/dev/null || true)
         GIT_DESCRIBE=$(git rev-parse --short HEAD)
         APK_NAME="NexAlloy-${GIT_DESCRIBE}.apk"
         RELEASE_TITLE="Nightly Build ${GIT_DESCRIBE}"
-        RELEASE_NOTES="Nightly build from commit ${GIT_DESCRIBE}. See changes: https://github.com/${GITHUB_REPOSITORY}/compare/${LATEST_REL}...main"
+        if [ -n "$LATEST_REL" ]; then
+          RELEASE_NOTES="Nightly build from commit ${GIT_DESCRIBE}. See changes: https://github.com/${GITHUB_REPOSITORY}/compare/${LATEST_REL}...main"
+        else
+          RELEASE_NOTES="Nightly build from commit ${GIT_DESCRIBE}."
+        fi
 
         cd app/build/outputs/apk/release/
         mv app-release.apk "$APK_NAME"
