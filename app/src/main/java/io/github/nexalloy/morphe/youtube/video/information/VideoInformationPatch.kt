@@ -7,7 +7,6 @@ import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 import io.github.nexalloy.bindProxy
 import io.github.nexalloy.createProxy
-import io.github.nexalloy.findFirstFieldByExactType
 import io.github.nexalloy.getStaticObjectField
 import io.github.nexalloy.hookMethod
 import io.github.nexalloy.morphe.shared.misc.litho.context.conversionContextPatch
@@ -94,7 +93,8 @@ class PlaybackSpeedMenu(
     }
 
     override fun patch_setSpeed(speed: Float) {
-        setPlaybackSpeedMethod(controller.get(), speed)
+        val controller = controller.get() ?: return
+        setPlaybackSpeedMethod(controller, speed)
     }
 }
 
@@ -256,8 +256,12 @@ val VideoInformationPatch = patch(
 
     // videoQuality
     val videoQualityClass = ::VideoQualityClass.clazz
-    val qualityNameField = videoQualityClass.findFirstFieldByExactType(String::class.java)
-    val resolutionField = videoQualityClass.findFirstFieldByExactType(Int::class.java)
+    val qualityNameField = videoQualityClass.declaredFields
+        .single { it.type == String::class.java }
+        .apply { isAccessible = true }
+    val resolutionField = videoQualityClass.declaredFields
+        .single { it.type == Int::class.java }
+        .apply { isAccessible = true }
 
     val getQualityName = { quality: Any -> qualityNameField.get(quality) as String }
     val getResolution = { quality: Any -> resolutionField.get(quality) as Int }
