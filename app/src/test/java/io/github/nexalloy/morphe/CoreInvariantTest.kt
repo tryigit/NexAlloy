@@ -4,6 +4,7 @@ import io.github.nexalloy.AppVersion
 import io.github.nexalloy.ScopedHookStateStack
 import io.github.nexalloy.decodeCacheStringList
 import io.github.nexalloy.encodeCacheStringList
+import io.github.nexalloy.invokeFindClass
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
@@ -13,6 +14,16 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class CoreInvariantTest {
+    private class MissingClassLoader : ClassLoader() {
+        @Suppress("UNUSED_PARAMETER")
+        fun lookup(name: String): Class<*> = throw ClassNotFoundException(name)
+    }
+
+    private class BrokenClassLoader : ClassLoader() {
+        @Suppress("UNUSED_PARAMETER")
+        fun lookup(name: String): Class<*> = throw IllegalStateException("broken loader")
+    }
+
     @Suppress("DEPRECATION")
     @Test
     fun instanceOfUsesInstanceOfOpcode() {
@@ -209,5 +220,25 @@ class CoreInvariantTest {
 
         assertTrue(state.pop(parent))
         assertNull(state.current())
+    }
+
+    @Test
+    fun reflectiveClassLookupUnwrapsExpectedMisses() {
+        val loader = MissingClassLoader()
+        val method = MissingClassLoader::class.java.getDeclaredMethod("lookup", String::class.java)
+        val error = assertThrows(ClassNotFoundException::class.java) {
+            invokeFindClass(method, loader, "missing.Type")
+        }
+        assertEquals("missing.Type", error.message)
+    }
+
+    @Test
+    fun reflectiveClassLookupPreservesUnexpectedFailures() {
+        val loader = BrokenClassLoader()
+        val method = BrokenClassLoader::class.java.getDeclaredMethod("lookup", String::class.java)
+        val error = assertThrows(IllegalStateException::class.java) {
+            invokeFindClass(method, loader, "broken.Type")
+        }
+        assertEquals("broken loader", error.message)
     }
 }
