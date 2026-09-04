@@ -1,7 +1,6 @@
 package io.github.nexalloy.morphe.youtube.layout.hide.shorts
 
 import app.morphe.extension.youtube.patches.components.ShortsFilter
-import de.robv.android.xposed.XC_MethodReplacement
 import io.github.nexalloy.morphe.shared.misc.litho.filter.addLithoFilter
 import io.github.nexalloy.morphe.shared.misc.settings.preference.PreferenceCategory
 import io.github.nexalloy.morphe.shared.misc.settings.preference.PreferenceScreenPreference
@@ -98,26 +97,18 @@ val HideShortsComponents = patch(
 
     // region Disable experimental Shorts flags.
 
-    // Flags might be present in earlier targets, but they are not found in 19.47.53.
-    // If these flags are forced on, the experimental layout is still not used, and
-    // it appears the features requires additional server side data to fully use.
-
-    // Experimental Shorts player uses Android native buttons and not Litho,
-    // and the layout is provided by the server.
-    //
-    // Since the buttons are native components and not Litho, it should be possible to
-    // fix the RYD Shorts loading delay by asynchronously loading RYD and updating
-    // the button text after RYD has loaded.
-    ShortsExperimentalPlayerFeatureFlagFingerprint.hookMethod(
-        XC_MethodReplacement.returnConstant(
-            false
-        )
-    )
-
-    // Experimental UI renderer must also be disabled since it requires the
-    // experimental Shorts player. If this is enabled but Shorts player
-    // is disabled then the app crashes when the Shorts player is opened.
-    RenderNextUIFeatureFlagFingerprint.hookMethod(XC_MethodReplacement.returnConstant(false))
+    // Upstream uses returnLate(false): the target methods must still execute normally,
+    // with only their successful Boolean return values forced off.
+    listOf(
+        ShortsExperimentalPlayerFeatureFlagFingerprint,
+        RenderNextUIFeatureFlagFingerprint,
+    ).forEach { fingerprint ->
+        fingerprint.hookMethod {
+            after { param ->
+                if (!param.hasThrowable()) param.result = false
+            }
+        }
+    }
     // endregion
 
     val originalDoubleTapValues = ThreadLocal<ArrayDeque<Boolean>>()
