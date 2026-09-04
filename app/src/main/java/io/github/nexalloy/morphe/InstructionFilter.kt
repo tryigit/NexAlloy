@@ -360,8 +360,11 @@ class MethodCallFilter internal constructor(
                     "Class initializer must use ()V: $methodSignature"
                 }
             }
-            require(paramDescriptors.sumOf(::parameterSlotCount) <= 255) {
-                "Method parameter descriptors exceed 255 slots: $methodSignature"
+
+            val parameterSlots = paramDescriptors.sumOf(::parameterSlotCount)
+            val maximumParameterSlots = if (methodName == "<init>") 254 else 255
+            require(parameterSlots <= maximumParameterSlots) {
+                "Method parameter descriptors exceed $maximumParameterSlots slots: $methodSignature"
             }
 
             return MethodCallFilter(
