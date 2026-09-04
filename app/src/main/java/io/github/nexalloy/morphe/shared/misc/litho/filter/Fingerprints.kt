@@ -47,6 +47,7 @@ val accessibilityTextMethod = findMethodDirect {
             )
         ),
         custom = {
+            modifiers(AccessFlags.SYNTHETIC.modifier)
         }
     ).instructionMatches.first().instruction.methodRef!!
 }
