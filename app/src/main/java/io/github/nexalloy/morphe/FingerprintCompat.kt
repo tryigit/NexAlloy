@@ -246,6 +246,9 @@ open class Fingerprint internal constructor(
     internal var classFinder: FindClassFunc? = null
     internal var classMatcherBlock: (ClassMatcher.() -> Unit)? = null
     internal var extraMethodMatcherBlocks: List<MethodMatcher.() -> Unit>? = null
+    private val definingClassPattern = definingClass
+    private val returnTypePattern = returnType
+    private val parametersPattern = parameters
 
     init {
         if (classFingerprint != null) {
@@ -388,9 +391,9 @@ open class Fingerprint internal constructor(
             targetDefiningClass = targetDefiningClass,
             targetReturnType = targetReturnType,
             targetParameters = targetParameters,
-            fingerprintDefiningClass = definingClass,
-            fingerprintReturnType = returnType,
-            fingerprintParameters = parameters,
+            fingerprintDefiningClass = definingClassPattern,
+            fingerprintReturnType = returnTypePattern,
+            fingerprintParameters = parametersPattern,
         )
     }
 
@@ -528,7 +531,7 @@ class Match constructor(
     val instructionMatchesOrNull = _instructionMatches
 
     /**
-     * A match for an [InstructionFilter].
+     * A match for the [InstructionFilter].
      * @param filter The filter that matched
      * @param index The instruction index it matched with.
      * @param instruction The instruction that matched.
