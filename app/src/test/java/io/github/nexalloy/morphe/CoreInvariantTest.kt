@@ -1,11 +1,13 @@
 package io.github.nexalloy.morphe
 
 import io.github.nexalloy.AppVersion
+import io.github.nexalloy.ScopedHookStateStack
 import io.github.nexalloy.decodeCacheStringList
 import io.github.nexalloy.encodeCacheStringList
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -182,5 +184,30 @@ class CoreInvariantTest {
         assertNull(decodeCacheStringList("list-v1:nope:value"))
         assertNull(decodeCacheStringList("list-v1:10:short"))
         assertNull(decodeCacheStringList("list-v1:-1:"))
+    }
+
+    @Test
+    fun scopedHookStatePreservesParentAcrossReentrancy() {
+        val state = ScopedHookStateStack<Any>()
+        val parent = Any()
+        val child = Any()
+
+        state.push(parent)
+        val parentFrame = state.current()!!
+        assertSame(parent, parentFrame.outerParam)
+        parentFrame.innerDepth = 2
+
+        state.push(child)
+        val childFrame = state.current()!!
+        assertSame(child, childFrame.outerParam)
+        assertEquals(0, childFrame.innerDepth)
+
+        assertTrue(state.pop(child))
+        val restoredParent = state.current()!!
+        assertSame(parent, restoredParent.outerParam)
+        assertEquals(2, restoredParent.innerDepth)
+
+        assertTrue(state.pop(parent))
+        assertNull(state.current())
     }
 }
