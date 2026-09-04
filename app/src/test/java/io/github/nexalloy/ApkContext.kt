@@ -22,17 +22,14 @@ class ApkContext(apkPath: String) : AutoCloseable {
         jadx = try {
             setupJadx(apkPath)
         } catch (e: Throwable) {
-            dexkit.close()
+            e.suppressCleanup { dexkit.close() }
             throw e
         }
         appVersion = try {
             jadx.getAppVersion()
         } catch (e: Throwable) {
-            try {
-                dexkit.close()
-            } finally {
-                jadx.close()
-            }
+            e.suppressCleanup { dexkit.close() }
+            e.suppressCleanup { jadx.close() }
             throw e
         }
     }
@@ -71,7 +68,7 @@ class ApkContext(apkPath: String) : AutoCloseable {
             jadx.load()
             return jadx
         } catch (e: Throwable) {
-            jadx.close()
+            e.suppressCleanup { jadx.close() }
             throw e
         }
     }
@@ -87,10 +84,29 @@ class ApkContext(apkPath: String) : AutoCloseable {
 
     override fun close() {
         jadxResourceReader.remove()
+        var failure: Throwable? = null
         try {
             dexkit.close()
-        } finally {
-            jadx.close()
+        } catch (e: Throwable) {
+            failure = e
         }
+        try {
+            jadx.close()
+        } catch (e: Throwable) {
+            if (failure == null) {
+                failure = e
+            } else {
+                failure.addSuppressed(e)
+            }
+        }
+        failure?.let { throw it }
+    }
+}
+
+private inline fun Throwable.suppressCleanup(block: () -> Unit) {
+    try {
+        block()
+    } catch (cleanupError: Throwable) {
+        addSuppressed(cleanupError)
     }
 }
