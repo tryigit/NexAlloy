@@ -2,6 +2,7 @@
 
 package io.github.nexalloy.activity
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.ComponentName
 import android.content.Intent
@@ -138,6 +139,8 @@ class SettingsActivity : Activity(), SettingApplication.ServiceStateListener {
         }
     }
 
+    // API 33+ back gestures are routed here explicitly through OnBackInvokedDispatcher in onCreate.
+    @SuppressLint("GestureBackNavigation")
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         finishAndRemoveTask()
