@@ -107,7 +107,7 @@ internal class ScopedHookStateStack<T : Any> {
     private val frames = ThreadLocal<ArrayDeque<Frame<T>>>()
 
     fun push(outerParam: T) {
-        val stack = frames.get() ?: ArrayDeque<Frame<T>>>().also(frames::set)
+        val stack = frames.get() ?: ArrayDeque<Frame<T>>().also(frames::set)
         stack.addLast(Frame(outerParam))
     }
 
