@@ -13,8 +13,9 @@ val cronetImageUrlHookPatch = patch(
     MessageDigestImageUrlFingerprint.hookMethod {
         before { param ->
             var url = param.args[0] as String? ?: return@before
-            imageUrlHooks.forEach {
-                url = it(url)
+            val hooks = imageUrlHooks
+            for (hook in hooks) {
+                url = hook(url)
             }
             param.args[0] = url
         }
@@ -22,19 +23,23 @@ val cronetImageUrlHookPatch = patch(
 
     OnSucceededFingerprint.hookMethod {
         before { param ->
-            imageUrlSuccessCallbackHook.forEach {
-                it(param.args[0] as UrlRequest, param.args[1] as UrlResponseInfo)
+            val hooks = imageUrlSuccessCallbackHooks
+            val request = param.args[0] as UrlRequest
+            val responseInfo = param.args[1] as UrlResponseInfo
+            for (hook in hooks) {
+                hook(request, responseInfo)
             }
         }
     }
 
     OnFailureFingerprint.hookMethod {
         before { param ->
+            val hooks = imageUrlErrorCallbackHooks
             val request = param.args[0] as UrlRequest
             val responseInfo = param.args[1] as? UrlResponseInfo
             val exception = param.args[2] as IOException
-            imageUrlErrorCallbackHook.forEach {
-                it(request, responseInfo, exception)
+            for (hook in hooks) {
+                hook(request, responseInfo, exception)
             }
         }
     }
@@ -46,18 +51,31 @@ private lateinit var urlJField: Field
 
 fun getHookedUrl(o: CronetUrlRequest) = urlJField.get(o) as String
 
-private var imageUrlHooks = listOf<(String) -> String>()
-private var imageUrlSuccessCallbackHook = listOf<(UrlRequest, UrlResponseInfo) -> Unit>()
-private var imageUrlErrorCallbackHook = listOf<(UrlRequest, UrlResponseInfo?, IOException) -> Unit>()
+@Volatile
+private var imageUrlHooks = emptyArray<(String) -> String>()
+
+@Volatile
+private var imageUrlSuccessCallbackHooks = emptyArray<(UrlRequest, UrlResponseInfo) -> Unit>()
+
+@Volatile
+private var imageUrlErrorCallbackHooks = emptyArray<(UrlRequest, UrlResponseInfo?, IOException) -> Unit>()
+
+private val hookRegistrationLock = Any()
 
 fun addImageUrlHook(f: (String) -> String, highPriority: Boolean = false) {
-    imageUrlHooks = if (highPriority) listOf(f) + imageUrlHooks else imageUrlHooks + listOf(f)
+    synchronized(hookRegistrationLock) {
+        imageUrlHooks = if (highPriority) arrayOf(f) + imageUrlHooks else imageUrlHooks + f
+    }
 }
 
 fun addImageUrlSuccessCallbackHook(f: (UrlRequest, UrlResponseInfo) -> Unit) {
-    imageUrlSuccessCallbackHook += listOf(f)
+    synchronized(hookRegistrationLock) {
+        imageUrlSuccessCallbackHooks = imageUrlSuccessCallbackHooks + f
+    }
 }
 
 fun addImageUrlErrorCallbackHook(f: (UrlRequest, UrlResponseInfo?, IOException) -> Unit) {
-    imageUrlErrorCallbackHook += listOf(f)
+    synchronized(hookRegistrationLock) {
+        imageUrlErrorCallbackHooks = imageUrlErrorCallbackHooks + f
+    }
 }
