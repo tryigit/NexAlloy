@@ -1,5 +1,6 @@
 package io.github.nexalloy.morphe.youtube.misc.contexthook
 
+import io.github.nexalloy.hookMethod
 import io.github.nexalloy.morphe.youtube.misc.playservice.VersionCheck
 import io.github.nexalloy.patch
 
