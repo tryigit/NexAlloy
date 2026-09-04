@@ -227,12 +227,18 @@ val SponsorBlock = patch(
         )
     )
 
-    // Append the new time to the player layout.
-    AppendTimeFingerprint.hookMethod {
-        before {
-            it.args[2] = YouTubeSponsorBlockConfig.appendTimeWithoutSegments(it.args[2].toString())
+    // Append the new time to the player layout at the same Resources.getString call
+    // used by the bytecode patch, rather than rewriting an unrelated input argument.
+    AppendTimeFingerprint.hookMethod(
+        scopedHook(
+            DexMethod("Landroid/content/res/Resources;->getString(I[Ljava/lang/Object;)Ljava/lang/String;").toMember()
+        ) {
+            after { param ->
+                if (param.args[0] != total_time) return@after
+                param.result = YouTubeSponsorBlockConfig.appendTimeWithoutSegments(param.result.toString())
+            }
         }
-    }
+    )
 
     // Initialize the player controller.
     onCreateHook.add { YouTubeSponsorBlockConfig.initialize(it) }
