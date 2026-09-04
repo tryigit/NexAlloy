@@ -154,6 +154,22 @@ class CoreInvariantTest {
     }
 
     @Test
+    fun smaliParsersValidateJvmSpecialMethodDescriptors() {
+        methodCall("Lfoo;-><init>(I)V")
+        methodCall("Lfoo;-><clinit>()V")
+
+        listOf(
+            "Lfoo;-><init>()I",
+            "Lfoo;-><clinit>(I)V",
+            "Lfoo;-><clinit>()I"
+        ).forEach { signature ->
+            assertThrows(IllegalArgumentException::class.java) {
+                methodCall(signature)
+            }
+        }
+    }
+
+    @Test
     fun smaliParsersEnforceJvmDescriptorLimits() {
         val tooDeepArray = "[".repeat(256) + "I"
         assertThrows(IllegalArgumentException::class.java) {
