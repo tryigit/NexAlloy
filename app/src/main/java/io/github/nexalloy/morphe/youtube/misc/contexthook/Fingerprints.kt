@@ -199,12 +199,25 @@ internal val searchRequestBodyMethod = findMethodDirect {
 }
 
 internal val getWatchRequestBodyMethods = findMethodListDirect {
-    findMethod {
+    val constructors = findMethod {
         matcher {
             accessFlags(AccessFlags.PUBLIC, AccessFlags.CONSTRUCTOR)
             strings("get_watch")
         }
-    }.map { constructor ->
+    }.distinctBy { it.declaredClass!!.descriptor }
+
+    val primary = constructors.filter {
+        it.declaredClass!!.fields.any { field ->
+            field.typeName == "java.util.function.Consumer"
+        }
+    }.single()
+    val secondary = constructors.filter {
+        it.declaredClass!!.fields.none { field ->
+            field.typeName == "java.util.function.Consumer"
+        }
+    }.single()
+
+    listOf(primary, secondary).map { constructor ->
         constructor.declaredClass!!.findMethod {
             matcher {
                 accessFlags(AccessFlags.PROTECTED, AccessFlags.FINAL)
@@ -212,7 +225,7 @@ internal val getWatchRequestBodyMethods = findMethodListDirect {
                 parameters()
             }
         }.single()
-    }.distinctBy { it.descriptor }
+    }
 }
 
 internal val reelRequestBodyMethods = findMethodListDirect {
