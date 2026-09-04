@@ -55,6 +55,8 @@ class CoreInvariantTest {
         assertTrue(location.indexIsValidForMatching(3, 4))
         assertTrue(location.indexIsValidForMatching(3, 6))
         assertFalse(location.indexIsValidForMatching(3, 7))
+        assertFalse(location.indexIsValidForMatching(3, 3))
+        assertFalse(location.indexIsValidForMatching(3, 2))
         assertThrows(IllegalArgumentException::class.java) {
             location.indexIsValidForMatching(-1, 0)
         }
@@ -87,6 +89,16 @@ class CoreInvariantTest {
         }
         assertThrows(IllegalArgumentException::class.java) {
             fieldAccess("Lx;->f:V")
+        }
+    }
+
+    @Test
+    fun smaliParsersRejectEmptyObjectDescriptors() {
+        assertThrows(IllegalArgumentException::class.java) {
+            methodCall("Lx;->m(L;)V")
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            methodCall("Lx;->m([L;)V")
         }
     }
 }
