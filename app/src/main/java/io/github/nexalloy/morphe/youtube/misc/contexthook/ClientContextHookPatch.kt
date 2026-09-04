@@ -13,14 +13,22 @@ internal enum class ClientContextEndpoint {
     REEL,
     SEARCH;
 
-    val osNameHooks = mutableListOf<(String) -> String>()
+    @Volatile
+    var osNameHooks: Array<(String) -> String> = emptyArray()
+        private set
+
+    fun addOSNameHook(hook: (String) -> String) {
+        synchronized(this) {
+            osNameHooks = osNameHooks + hook
+        }
+    }
 }
 
 internal fun addOSNameHook(
     endpoint: ClientContextEndpoint,
     hook: (String) -> String
 ) {
-    endpoint.osNameHooks += hook
+    endpoint.addOSNameHook(hook)
 }
 
 internal val ClientContextHook = patch {
@@ -32,12 +40,13 @@ internal val ClientContextHook = patch {
     val builderMethod = ::messageLiteBuilderMethod.method.apply { isAccessible = true }
 
     fun applyHooks(target: Any, endpoint: ClientContextEndpoint) {
-        if (endpoint.osNameHooks.isEmpty()) return
+        val hooks = endpoint.osNameHooks
+        if (hooks.isEmpty()) return
         val builder = builderMethod.invoke(target) ?: return
         val contextBody = builderField.get(builder) ?: return
         val clientInfo = clientField.get(contextBody) ?: return
         var osName = osField.get(clientInfo) as? String ?: return
-        endpoint.osNameHooks.forEach { hook ->
+        for (hook in hooks) {
             osName = hook(osName)
         }
         osField.set(clientInfo, osName)
