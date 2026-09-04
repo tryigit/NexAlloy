@@ -1,6 +1,5 @@
 package io.github.nexalloy.morphe.shared.misc.privacy
 
-import android.content.ClipData
 import android.content.Intent
 import app.morphe.extension.shared.patches.SanitizeSharingLinksPatch
 import io.github.nexalloy.PatchExecutor
