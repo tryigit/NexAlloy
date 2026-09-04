@@ -34,22 +34,39 @@ internal object AppendTimeFingerprint : Fingerprint(
     )
 )
 
-val SponsorBarRect = findFieldDirect {
+val rectangleFieldInvalidatorFingerprint = findMethodDirect {
     val clazz = seekbarFingerprint().declaredClass!!
     clazz.findMethod {
         matcher {
-            addInvoke {
-                name = "invalidate"
-                paramTypes("android.graphics.Rect")
-            }
+            returnType = "void"
+            paramTypes()
+            addInvoke { name = "invalidate" }
         }
-    }.single().usingFields.last { it.field.typeName == "android.graphics.Rect" }.field
+    }.single()
+}
+
+val SponsorBarRect = findFieldDirect {
+    val method = rectangleFieldInvalidatorFingerprint()
+    val invalidateIndex = method.instructions.first {
+        it.methodRef?.name == "invalidate"
+    }.index
+
+    method.instructions.asReversed().firstNotNullOfOrNull { instruction ->
+        if (instruction.index >= invalidateIndex) {
+            null
+        } else {
+            instruction.fieldRef?.takeIf { it.typeName == "android.graphics.Rect" }
+        }
+    } ?: error("Could not resolve SponsorBlock seekbar rectangle field")
 }
 
 val seekbarOnDrawFingerprint = findMethodDirect {
     seekbarFingerprint().declaredClass!!.findMethod {
         matcher {
             name = "onDraw"
+            addInvoke {
+                descriptor = "Ljava/lang/Math;->round(F)I"
+            }
         }
     }.single()
 }
