@@ -32,7 +32,7 @@ fun interface InstructionLocation {
      *
      * This can only be used for the first filter, and using with any other filter will throw an exception.
      */
-    class MatchFirst() : InstructionLocation {
+    class MatchFirst : InstructionLocation {
         override fun indexIsValidForMatching(
             previouslyMatchedIndex: Int,
             currentIndex: Int
@@ -40,7 +40,7 @@ fun interface InstructionLocation {
             require(previouslyMatchedIndex < 0) {
                 "MatchFirst can only be used for the first instruction filter"
             }
-            return true
+            return currentIndex == 0
         }
     }
 
@@ -54,7 +54,7 @@ fun interface InstructionLocation {
      *
      * This cannot be used for the first filter and will throw an exception.
      */
-    class MatchAfterImmediately() : InstructionLocation {
+    class MatchAfterImmediately : InstructionLocation {
         override fun indexIsValidForMatching(
             previouslyMatchedIndex: Int,
             currentIndex: Int
@@ -91,6 +91,9 @@ fun interface InstructionLocation {
             previouslyMatchedIndex: Int,
             currentIndex: Int
         ): Boolean {
+            require(previouslyMatchedIndex >= 0) {
+                "MatchAfterWithin cannot be used for the first instruction filter"
+            }
             return currentIndex - previouslyMatchedIndex - 1 <= matchDistance
         }
     }
@@ -104,7 +107,7 @@ fun interface InstructionLocation {
      * must exist between this instruction and the last matched instruction. A value of 0 is
      * functionally identical to [MatchAfterImmediately].
      */
-    class MatchAfterAtLeast(var minimumDistanceFromLastInstruction: Int) : InstructionLocation {
+    class MatchAfterAtLeast(val minimumDistanceFromLastInstruction: Int) : InstructionLocation {
         init {
             require(minimumDistanceFromLastInstruction >= 0) {
                 "minimumDistanceFromLastInstruction must >= 0"
@@ -137,11 +140,10 @@ fun interface InstructionLocation {
         val minimumDistanceFromLastInstruction: Int,
         val maximumDistanceFromLastInstruction: Int
     ) : InstructionLocation {
-
-        private val minMatcher = MatchAfterAtLeast(minimumDistanceFromLastInstruction)
-        private val maxMatcher = MatchAfterWithin(maximumDistanceFromLastInstruction)
-
         init {
+            require(minimumDistanceFromLastInstruction >= 0) {
+                "minimumDistanceFromLastInstruction must be non-negative"
+            }
             require(minimumDistanceFromLastInstruction <= maximumDistanceFromLastInstruction) {
                 "minimumDistanceFromLastInstruction must be <= maximumDistanceFromLastInstruction"
             }
@@ -151,10 +153,8 @@ fun interface InstructionLocation {
             previouslyMatchedIndex: Int,
             currentIndex: Int
         ): Boolean {
-            // For the first filter, previouslyMatchedIndex will be -1, and both delegates
-            // will correctly enforce their own semantics starting from index 0.
-            return minMatcher.indexIsValidForMatching(previouslyMatchedIndex, currentIndex) &&
-                    maxMatcher.indexIsValidForMatching(previouslyMatchedIndex, currentIndex)
+            val distance = currentIndex - previouslyMatchedIndex - 1
+            return distance in minimumDistanceFromLastInstruction..maximumDistanceFromLastInstruction
         }
     }
 }
@@ -260,7 +260,7 @@ open class OpcodesFilter protected constructor(
         enclosingMethod: MethodData,
         instruction: InstructionData
     ): Boolean {
-        val opcodesLocal = opcodes ?: return true // Match anything.
+        val opcodesLocal = opcodes ?: return true
         return opcodesLocal.contains(Opcode.fromInt(instruction.opcode))
     }
 
@@ -276,11 +276,9 @@ open class OpcodesFilter protected constructor(
             var location: InstructionLocation? = null
 
             opcodes.forEach { opcode ->
-                // First opcode can match anywhere.
                 val opcodeLocation = location ?: InstructionLocation.MatchAfterAnywhere()
 
                 list += if (opcode == null) {
-                    // Null opcode matches anything.
                     OpcodesFilter(
                         null as List<Opcode>?,
                         opcodeLocation
@@ -305,9 +303,6 @@ class LiteralFilter internal constructor(
     location: InstructionLocation
 ) : OpcodesFilter(opcodes, location) {
 
-    /**
-     * Store the lambda value instead of calling it more than once.
-     */
     private val literalValue: Long by lazy(literal)
 
     override fun matches(
@@ -399,7 +394,6 @@ fun literal(
     location: InstructionLocation = InstructionLocation.MatchAfterAnywhere()
 ) = LiteralFilter(literal, opcodes, location)
 
-
 class MethodCallFilter internal constructor(
     val definingClass: String? = null,
     val name: String? = null,
@@ -417,7 +411,6 @@ class MethodCallFilter internal constructor(
     private val parameterTypeComparison =
         StringComparisonType.typeDeclarationToComparison(parameters)
 
-
     override fun matches(
         enclosingMethod: MethodData,
         instruction: InstructionData
@@ -428,7 +421,6 @@ class MethodCallFilter internal constructor(
 
         val reference = instruction.methodRef ?: return false
 
-        // Store local to avoid duplicate field access and Kotlin intrinsic null check calls.
         val nameLocal = name
         if (nameLocal != null && reference.name != nameLocal) {
             return false
@@ -438,10 +430,6 @@ class MethodCallFilter internal constructor(
         if (definingClassLocal != null) {
             val referenceClass = reference.declaredClass!!.descriptor
 
-            // Check if 'this' defining class is used.
-            // Would be nice if this also checked all super classes,
-            // but doing so requires iteratively checking all superclasses
-            // up to the root class since class defs are mere Strings.
             if (definingClassLocal == "this") {
                 if (referenceClass != enclosingMethod.declaredClass!!.descriptor) {
                     return false
@@ -483,7 +471,6 @@ class MethodCallFilter internal constructor(
         }
     }
 
-
     internal companion object {
         private val regex =
             Regex("""^(L[^;]+;)->([^(\s]+)\(([^)]*)\)(\[?L[^;]+;|\[?[BCSIJFDZV])${'$'}""")
@@ -513,39 +500,27 @@ class MethodCallFilter internal constructor(
             )
         }
 
-        /**
-         * Parses a single JVM type descriptor or an array descriptor at the current position.
-         * For example: Lcom/example/SomeClass; or I or [I or [Lcom/example/SomeClass;
-         */
         private fun parseSingleType(params: String, startIndex: Int): Pair<String, Int> {
             var i = startIndex
 
-            // Skip past array declaration, including multi-dimensional arrays.
             val paramsLength = params.length
             while (i < paramsLength && params[i] == '[') {
                 i++
             }
 
             return if (i < paramsLength && params[i] == 'L') {
-                // It's an object type starting with 'L', read until ';'
                 val semicolonPos = params.indexOf(';', i)
                 if (semicolonPos < 0) {
                     throw IllegalArgumentException("Malformed object descriptor (missing semicolon): $params")
                 }
-                // Substring from startIndex up to and including the semicolon.
                 val typeDescriptor = params.substring(startIndex, semicolonPos + 1)
                 typeDescriptor to (semicolonPos + 1)
             } else {
-                // It's either a primitive or we've already consumed the array part
-                // So just take one character (e.g. 'I', 'Z', 'B', etc.)
                 val typeDescriptor = params.substring(startIndex, i + 1)
                 typeDescriptor to (i + 1)
             }
         }
 
-        /**
-         * Parses the parameters into a list of JVM type descriptors.
-         */
         private fun parseParameterDescriptors(paramString: String): List<String> {
             val result = mutableListOf<String>()
             var currentIndex = 0
@@ -730,10 +705,9 @@ class FieldAccessFilter internal constructor(
 
     context(matcher: MethodMatcher)
     override fun addQuery() {
-
         val declaredClassName = this@FieldAccessFilter.definingClass?.let(::getTypeNameCompat)
 
-        (declaredClassName ?: name ?: type)?.let { _ ->
+        (declaredClassName ?: name ?: type)?.let {
             matcher.addUsingField {
                 declaredClassName?.let { declaredClass(it) }
                 this@FieldAccessFilter.name?.let { name(it) }
@@ -763,7 +737,6 @@ class FieldAccessFilter internal constructor(
         }
     }
 }
-
 
 /**
  * Matches a field call, such as:
@@ -893,16 +866,12 @@ fun fieldAccess(
     location: InstructionLocation = InstructionLocation.MatchAfterAnywhere()
 ) = parseJvmFieldAccess(smali, listOf(opcode), location)
 
-
 class StringFilter internal constructor(
     val string: () -> String,
     val comparison: StringComparisonType,
     location: InstructionLocation
 ) : OpcodesFilter(listOf(Opcode.CONST_STRING, Opcode.CONST_STRING_JUMBO), location) {
 
-    /**
-     * Store the lambda value instead of calling it more than once.
-     */
     internal val stringValue: String by lazy(string)
 
     override fun matches(
@@ -955,11 +924,6 @@ fun string(
  */
 fun string(
     string: String,
-    /**
-     * How to match a given string opcode literal. Default is exact string equality. For more
-     * precise matching of multiple strings, consider using [anyInstruction] with multiple
-     * exact string declarations.
-     */
     comparison: StringComparisonType = StringComparisonType.EQUALS,
     location: InstructionLocation = InstructionLocation.MatchAfterAnywhere()
 ) = StringFilter({ string }, comparison, location)
@@ -978,15 +942,11 @@ fun string(
     location: InstructionLocation = InstructionLocation.MatchAfterAnywhere()
 ) = StringFilter(string, comparison, location)
 
-
 class NewInstanceFilter internal constructor(
     val type: () -> String,
     location: InstructionLocation
 ) : OpcodesFilter(listOf(Opcode.NEW_INSTANCE, Opcode.NEW_ARRAY), location) {
 
-    /**
-     * Store the lambda value instead of calling it more than once.
-     */
     private val typeValue: String by lazy {
         val typeValue = type()
         typeValue
@@ -1061,15 +1021,11 @@ fun newInstance(
     location: InstructionLocation = InstructionLocation.MatchAfterAnywhere()
 ) = NewInstanceFilter(type, location)
 
-
 class InstanceOfFilter internal constructor(
     val type: () -> String,
     location: InstructionLocation = InstructionLocation.MatchAfterAnywhere()
 ) : OpcodeFilter(Opcode.INSTANCE_OF, location) {
 
-    /**
-     * Store the lambda value instead of calling it more than once.
-     */
     private val typeValue: String by lazy {
         val typeValue = type()
         typeValue
@@ -1140,15 +1096,11 @@ fun instanceOf(
     location: InstructionLocation = InstructionLocation.MatchAfterAnywhere()
 ) = InstanceOfFilter(type, location)
 
-
 class CheckCastFilter internal constructor(
     val type: () -> String,
     location: InstructionLocation = InstructionLocation.MatchAfterAnywhere()
 ) : OpcodeFilter(Opcode.CHECK_CAST, location) {
 
-    /**
-     * Store the lambda value instead of calling it more than once.
-     */
     private val typeValue: String by lazy {
         val typeValue = type()
         typeValue
