@@ -15,6 +15,8 @@ import io.github.nexalloy.morphe.resourceLiteral
 import io.github.nexalloy.morphe.resourceMappings
 import io.github.nexalloy.morphe.youtube.shared.seekbarFingerprint
 
+val total_time get() = resourceMappings["string", "total_time"]
+
 internal object AppendTimeFingerprint : Fingerprint(
     accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.FINAL),
     returnType = "V",
