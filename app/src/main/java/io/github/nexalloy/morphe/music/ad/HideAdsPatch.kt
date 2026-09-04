@@ -52,9 +52,11 @@ val HideAds = patch(
         }
     }
 
+    val floatingLayoutId = ResourceUtils.getIdIdentifier("floating_layout")
     FloatingLayoutFingerprint.hookMethod(
         scopedHook(::floatingLayoutFindViewById.member) {
             after { param ->
+                if (param.args[0] != floatingLayoutId) return@after
                 (param.result as? View)?.let(HideAdsPatch::hidePremiumPromotionBottomSheet)
             }
         }
