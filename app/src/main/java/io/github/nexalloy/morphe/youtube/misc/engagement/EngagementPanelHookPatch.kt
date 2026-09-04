@@ -11,26 +11,43 @@ private val engagementPanelIdHooks = mutableListOf<EngagementPanelIdHook>()
 val EngagementPanelHook = patch(
     description = "Hook to get the current engagement panel state.",
 ) {
-    val panelId = ThreadLocal<String?>()
-    ::panelInitFingerprint.hookMethod {
-        after {
-            panelId.set(it.args[0] as String?)
+    val panelIdFrames = ThreadLocal<MutableList<String?>>()
+
+    EngagementPanelControllerFingerprint.hookMethod {
+        before {
+            val frames = panelIdFrames.get()
+                ?: mutableListOf<String?>().also(panelIdFrames::set)
+            frames.add(null)
+        }
+        after { param ->
+            val frames = panelIdFrames.get()
+            val id = if (!frames.isNullOrEmpty()) {
+                frames.removeAt(frames.lastIndex)
+            } else {
+                null
+            }
+            if (frames.isNullOrEmpty()) {
+                panelIdFrames.remove()
+            }
+            if (param.hasThrowable()) return@after
+
+            engagementPanelIdHooks.forEach { hook ->
+                if (hook(id)) {
+                    param.result = null
+                    return@after
+                }
+            }
+
+            EngagementPanel.open(id)
         }
     }
-    EngagementPanelControllerFingerprint.hookMethod {
-        after { param ->
-            val id = panelId.get()
-            try {
-                engagementPanelIdHooks.forEach { hook ->
-                    if (hook(id)) {
-                        param.result = null
-                        return@after
-                    }
-                }
 
-                EngagementPanel.open(id)
-            } finally {
-                panelId.remove()
+    ::panelInitFingerprint.hookMethod {
+        after { param ->
+            if (param.hasThrowable()) return@after
+            val frames = panelIdFrames.get() ?: return@after
+            if (frames.isNotEmpty()) {
+                frames[frames.lastIndex] = param.args[0] as String?
             }
         }
     }
