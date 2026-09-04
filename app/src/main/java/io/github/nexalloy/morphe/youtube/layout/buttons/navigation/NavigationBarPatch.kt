@@ -66,9 +66,11 @@ val NavigationBar = patch(
         }
     })
 
-    // Hide navigation button labels.
+    // Hide navigation button labels. The bytecode patch passes the target register from the
+    // matched TextView.setText call, so ignore any unrelated setText calls reached transitively.
     CreatePivotBarFingerprint.hookMethod(scopedHook(DexMethod("Landroid/widget/TextView;->setText(Ljava/lang/CharSequence;)V").toMethod()) {
         before { param ->
+            if (param.thisObject !== outerParam.args[1]) return@before
             NavigationBarPatch.hideNavigationButtonLabels(param.thisObject as TextView)
         }
     })
