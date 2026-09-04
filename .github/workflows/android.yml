@@ -1,8 +1,9 @@
 name: Android CI
 
 on:
-  push:
   pull_request:
+  push:
+    branches: [ "main" ]
 
 jobs:
   verify:
@@ -11,13 +12,13 @@ jobs:
       contents: read
 
     steps:
-    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
       with:
         submodules: true
         persist-credentials: false
 
     - name: Set up JDK
-      uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+      uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
       with:
         java-version: '17'
         distribution: 'temurin'
@@ -36,7 +37,7 @@ jobs:
       run: ./gradlew assembleDebug
 
     - name: Upload Debug Artifact
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
         name: nexalloy-ci-debug-apk
         path: app/build/outputs/apk/debug
@@ -52,13 +53,13 @@ jobs:
       cancel-in-progress: false
 
     steps:
-    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
       with:
         submodules: true
         persist-credentials: false
 
     - name: Set up JDK
-      uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+      uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
       with:
         java-version: '17'
         distribution: 'temurin'
@@ -84,7 +85,7 @@ jobs:
       run: ./gradlew assembleRelease
 
     - name: Upload Release Artifact
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
         name: nexalloy-ci-release-apk
         path: |
@@ -109,12 +110,10 @@ jobs:
         if gh release view autobuild >/dev/null 2>&1; then
           OLD_ASSETS=$(gh release view autobuild --json assets -q '.assets[].name')
 
-          # Stage the new APK first. If this fails, the existing release/tag remain untouched.
           if ! grep -Fxq "$APK_NAME" <<< "$OLD_ASSETS"; then
             gh release upload autobuild "$APK_NAME"
           fi
 
-          # Move the stable tag only after the new asset is safely available.
           if ! gh api --method PATCH "repos/${GITHUB_REPOSITORY}/git/refs/tags/autobuild" \
             -f sha="$GITHUB_SHA" -F force=true >/dev/null; then
             gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
@@ -126,7 +125,6 @@ jobs:
             --title "$RELEASE_TITLE" \
             --notes "$RELEASE_NOTES"
 
-          # Clean up previous APKs only after the replacement is fully published.
           while IFS= read -r old_asset; do
             if [ -n "$old_asset" ] && [ "$old_asset" != "$APK_NAME" ]; then
               gh release delete-asset autobuild "$old_asset" --yes
