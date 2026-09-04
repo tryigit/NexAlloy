@@ -352,6 +352,14 @@ class MethodCallFilter internal constructor(
             }
 
             val paramDescriptors = parseParameterDescriptors(matchResult.groupValues[3])
+            when (methodName) {
+                "<init>" -> require(returnDescriptor == "V") {
+                    "Constructor must return V: $methodSignature"
+                }
+                "<clinit>" -> require(paramDescriptors.isEmpty() && returnDescriptor == "V") {
+                    "Class initializer must use ()V: $methodSignature"
+                }
+            }
             require(paramDescriptors.sumOf(::parameterSlotCount) <= 255) {
                 "Method parameter descriptors exceed 255 slots: $methodSignature"
             }
