@@ -53,7 +53,8 @@ fun interface InstructionLocation {
             require(previouslyMatchedIndex >= 0) {
                 "MatchAfterWithin cannot be used for the first instruction filter"
             }
-            return currentIndex - previouslyMatchedIndex - 1 <= matchDistance
+            val distance = currentIndex - previouslyMatchedIndex - 1
+            return distance in 0..matchDistance
         }
     }
 
@@ -319,7 +320,7 @@ class MethodCallFilter internal constructor(
 
             return if (params[i] == 'L') {
                 val semicolonPos = params.indexOf(';', i)
-                require(semicolonPos >= 0) {
+                require(semicolonPos > i + 1) {
                     "Malformed object descriptor: $params"
                 }
                 params.substring(startIndex, semicolonPos + 1) to (semicolonPos + 1)
