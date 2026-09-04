@@ -159,10 +159,11 @@ class ScopedHook : XC_MethodHook() {
 lateinit var modulePath: String
 
 private val resourceLoader by lazy @RequiresApi(Build.VERSION_CODES.R) {
-    val fileDescriptor = ParcelFileDescriptor.open(
+    val provider = ParcelFileDescriptor.open(
         File(modulePath), ParcelFileDescriptor.MODE_READ_ONLY
-    )
-    val provider = ResourcesProvider.loadFromApk(fileDescriptor)
+    ).use { fileDescriptor ->
+        ResourcesProvider.loadFromApk(fileDescriptor)
+    }
     val loader = ResourcesLoader()
     loader.addProvider(provider)
     return@lazy loader
