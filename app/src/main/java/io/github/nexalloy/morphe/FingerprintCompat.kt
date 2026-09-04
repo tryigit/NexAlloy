@@ -82,7 +82,6 @@ fun MethodMatcher.literal(literalSupplier: () -> Number) {
     this.usingNumbers(literalSupplier())
 }
 
-
 private fun findLongestOpcodeSequence(filters: List<InstructionFilter>): List<InstructionFilter> {
     if (filters.isEmpty()) return emptyList()
 
@@ -187,15 +186,12 @@ class FingerprintDsl(init: FingerprintDsl.() -> Unit) {
             parameters = parameters,
         )
 
-        // Apply classFinder or classMatcher
         if (classFinder != null) {
             fp.classFinder = classFinder
         }
         if (classMatcherBlock != null) {
             fp.classMatcherBlock = classMatcherBlock
         }
-
-        // Apply extra methodMatcher blocks
         if (methodMatcherBlocks.isNotEmpty()) {
             fp.extraMethodMatcherBlocks = methodMatcherBlocks.toList()
         }
@@ -223,8 +219,9 @@ open class Fingerprint internal constructor(
         if (classFingerprint != null) {
             classFinder = { classFingerprint.run().declaredClass!! }
         }
-        if(custom != null)
+        if (custom != null) {
             extraMethodMatcherBlocks = listOf(custom)
+        }
     }
 
     /**
@@ -333,7 +330,6 @@ open class Fingerprint internal constructor(
      * @param custom A custom condition for this fingerprint.
      */
     constructor(
-// Required to disambiguate if defining class or class fingerprint is not specified.
         definingClass: String? = null,
         name: String? = null,
         accessFlags: List<AccessFlags>? = null,
@@ -355,7 +351,7 @@ open class Fingerprint internal constructor(
     fun run(): MethodData {
         val methodMatcher = buildMethodMatcher()
 
-        val results = if (classMatcherBlock != null) {
+        val candidates = if (classMatcherBlock != null) {
             dexkit.findClass {
                 matcher(ClassMatcher().apply(classMatcherBlock!!))
             }.findMethod {
@@ -370,6 +366,7 @@ open class Fingerprint internal constructor(
                 matcher(methodMatcher)
             }
         }
+        val results = candidates.filter { matchOrNull(it) != null }
         if (results.size != 1) {
             val name = this::class.simpleName ?: "Anonymous Fingerprint"
             val list = results.joinToString("\n  ") { it.descriptor }
@@ -401,7 +398,6 @@ open class Fingerprint internal constructor(
                 var lastMatchIndex = -1
 
                 firstFilterLoop@ while (true) {
-                    // Matched index of the first filter.
                     var firstFilterIndex = -1
                     var subIndex = firstInstructionIndex
 
@@ -439,11 +435,9 @@ open class Fingerprint internal constructor(
 
                         if (!instructionsMatched) {
                             if (filterIndex == 0) {
-                                return null // First filter has no more matches to start from.
+                                return null
                             }
 
-                            // Try again with the first filter, starting from
-                            // the next possible first filter index.
                             firstInstructionIndex = firstFilterIndex + 1
                             lastMatchIndex = -1
                             instructionMatches?.clear()
@@ -451,7 +445,6 @@ open class Fingerprint internal constructor(
                         }
                     }
 
-                    // All instruction filters matches.
                     return instructionMatches
                 }
             }
