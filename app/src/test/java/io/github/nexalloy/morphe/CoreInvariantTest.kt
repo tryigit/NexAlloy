@@ -12,6 +12,9 @@ import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.luckypray.dexkit.query.enums.MatchType
+import org.luckypray.dexkit.query.enums.StringMatchType
+import org.luckypray.dexkit.query.matchers.MethodMatcher
 
 class CoreInvariantTest {
     private class MissingClassLoader : ClassLoader() {
@@ -65,6 +68,71 @@ class CoreInvariantTest {
         assertEquals("int[]", getTypeNameCompat("[I"))
         assertEquals("java.lang.String", getTypeNameCompat("Ljava/lang/String;"))
         assertEquals("java.lang.String[][]", getTypeNameCompat("[[Ljava/lang/String;"))
+    }
+
+    @Test
+    fun partialTypesAreEnforcedAfterDexKitPrefilter() {
+        assertTrue(
+            methodTypeDeclarationsMatch(
+                targetDefiningClass = "Lcom/google/YouTubePlayerOverlaysLayout;",
+                targetReturnType = "Ljava/lang/String;",
+                targetParameters = listOf("Ljava/lang/Object;", "J"),
+                fingerprintDefiningClass = "/YouTubePlayerOverlaysLayout;",
+                fingerprintReturnType = "L",
+                fingerprintParameters = listOf("L", "J"),
+            )
+        )
+        assertTrue(
+            methodTypeDeclarationsMatch(
+                targetDefiningClass = "Lx;",
+                targetReturnType = "[Ljava/lang/String;",
+                targetParameters = emptyList(),
+                fingerprintDefiningClass = null,
+                fingerprintReturnType = "[L",
+                fingerprintParameters = emptyList(),
+            )
+        )
+        assertFalse(
+            methodTypeDeclarationsMatch(
+                targetDefiningClass = "Lx;",
+                targetReturnType = "I",
+                targetParameters = listOf("Ljava/lang/Object;"),
+                fingerprintDefiningClass = null,
+                fingerprintReturnType = "L",
+                fingerprintParameters = listOf("L"),
+            )
+        )
+        assertFalse(
+            methodTypeDeclarationsMatch(
+                targetDefiningClass = "Lx;",
+                targetReturnType = "V",
+                targetParameters = listOf("I"),
+                fingerprintDefiningClass = null,
+                fingerprintReturnType = "V",
+                fingerprintParameters = listOf("L"),
+            )
+        )
+    }
+
+    @Test
+    fun fingerprintAccessFlagsAreExactAndLegacyStringsContain() {
+        val accessMatcher = MethodMatcher().apply {
+            accessFlags(AccessFlags.PUBLIC, AccessFlags.FINAL)
+        }
+        assertEquals(MatchType.Equals, accessMatcher.modifiersMatcher!!.matchType)
+        assertEquals(
+            AccessFlags.PUBLIC.modifier or AccessFlags.FINAL.modifier,
+            accessMatcher.modifiersMatcher!!.modifiers
+        )
+
+        val noFlagsMatcher = MethodMatcher().apply { accessFlags() }
+        assertNull(noFlagsMatcher.modifiersMatcher)
+
+        val stringMatcher = Fingerprint(
+            classFingerprint = null,
+            strings = listOf("partial text")
+        ).buildMethodMatcher().usingStringsMatcher!!.single()
+        assertEquals(StringMatchType.Contains, stringMatcher.matchType)
     }
 
     @Test
