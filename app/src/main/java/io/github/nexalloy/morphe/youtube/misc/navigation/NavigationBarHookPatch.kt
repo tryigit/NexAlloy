@@ -64,7 +64,11 @@ val NavigationBarHook = patch(
     val selectedTab = ThreadLocal<View>()
     ::pivotBarButtonsViewSetSelectedFingerprint.hookMethod {
         before { selectedTab.remove() }
-        after { selectedTab.get()?.let { NavigationBar.navigationTabSelected(it, true) } }
+        after {
+            val tab = selectedTab.get()
+            selectedTab.remove()
+            tab?.let { NavigationBar.navigationTabSelected(it, true) }
+        }
     }
 
     ::pivotBarButtonsViewSetSelectedFingerprint.hookMethod(scopedHook(::pivotBarButtonsViewSetSelectedSubFingerprint.member) {
