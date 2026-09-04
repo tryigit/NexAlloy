@@ -20,7 +20,6 @@ import app.morphe.extension.youtube.settings.preference.AiSListStatsPreferenceCa
 import app.morphe.extension.youtube.settings.preference.HTMLPreference
 import app.morphe.extension.youtube.settings.preference.KeywordContentStatsPreferenceCategory
 import io.github.nexalloy.morphe.shared.misc.litho.filter.addLithoFilter
-import io.github.nexalloy.morphe.shared.misc.litho.filter.emptyComponentClass
 import io.github.nexalloy.morphe.shared.misc.litho.node.hookTreeNodeResult
 import io.github.nexalloy.morphe.shared.misc.settings.preference.InputType
 import io.github.nexalloy.morphe.shared.misc.settings.preference.ListPreference
@@ -42,10 +41,10 @@ import io.github.nexalloy.morphe.youtube.misc.playservice.VersionCheck
 import io.github.nexalloy.morphe.youtube.misc.playservice.is_20_26_or_greater
 import io.github.nexalloy.morphe.youtube.misc.playservice.is_20_31_or_greater
 import io.github.nexalloy.morphe.youtube.misc.settings.PreferenceScreen
-import io.github.nexalloy.new
 import io.github.nexalloy.patch
 import io.github.nexalloy.scopedHook
 import org.luckypray.dexkit.wrap.DexMethod
+import java.lang.reflect.InvocationTargetException
 
 val HideHorizontalShelves = patch {
     dependsOn(
@@ -409,15 +408,19 @@ val HideLayoutComponents = patch(
 
     // region hide mix playlists
 
-    ParseElementFromBufferFingerprint.hookMethod({
-        val emptyComponent = ::emptyComponentClass.clazz.new()
-        after {
+    ParseElementFromBufferFingerprint.hookMethod {
+        val emptyComponentMethod = ::parseElementEmptyReturnMethod.method
+        before {
             val bytes = it.args[2] as ByteArray
             if (LayoutComponentsFilter.filterMixPlaylists(bytes)) {
-                it.result = emptyComponent
+                try {
+                    it.result = emptyComponentMethod.invoke(null, it.args[0])
+                } catch (exception: InvocationTargetException) {
+                    it.throwable = exception.targetException
+                }
             }
         }
-    })
+    }
 
     // endregion
 
