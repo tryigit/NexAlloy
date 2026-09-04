@@ -105,8 +105,9 @@ val HideAds = patch(
         object : XC_MethodHook() {
             override fun afterHookedMethod(param: MethodHookParam) {
                 if (param.args[0] == adAttributionId) {
+                    val view = param.result as? View ?: return
                     Logger.printDebug { "Hide Ad Attribution View" }
-                    AdsFilter.hideAdAttributionView(param.result as View)
+                    AdsFilter.hideAdAttributionView(view)
                 }
             }
         })
