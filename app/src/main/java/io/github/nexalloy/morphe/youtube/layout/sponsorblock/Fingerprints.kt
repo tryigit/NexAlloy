@@ -2,13 +2,16 @@ package io.github.nexalloy.morphe.youtube.layout.sponsorblock
 
 import io.github.nexalloy.morphe.AccessFlags
 import io.github.nexalloy.morphe.Fingerprint
+import io.github.nexalloy.morphe.InstructionLocation.MatchAfterImmediately
 import io.github.nexalloy.morphe.InstructionLocation.MatchAfterWithin
 import io.github.nexalloy.morphe.Opcode
-import io.github.nexalloy.morphe.OpcodesFilter
+import io.github.nexalloy.morphe.ResourceType
 import io.github.nexalloy.morphe.fieldAccess
 import io.github.nexalloy.morphe.findFieldDirect
 import io.github.nexalloy.morphe.findMethodDirect
+import io.github.nexalloy.morphe.methodCall
 import io.github.nexalloy.morphe.opcode
+import io.github.nexalloy.morphe.resourceLiteral
 import io.github.nexalloy.morphe.resourceMappings
 import io.github.nexalloy.morphe.youtube.shared.seekbarFingerprint
 
@@ -18,17 +21,16 @@ internal object AppendTimeFingerprint : Fingerprint(
     parameters = listOf(
         "Ljava/lang/CharSequence;", "Ljava/lang/CharSequence;", "Ljava/lang/CharSequence;"
     ),
-    filters = OpcodesFilter.opcodesToFilters(
-        Opcode.INVOKE_VIRTUAL,
-        Opcode.MOVE_RESULT_OBJECT,
-        Opcode.IGET_OBJECT,
-        Opcode.IGET_OBJECT,
-        Opcode.CHECK_CAST,
-        Opcode.INVOKE_VIRTUAL,
-        Opcode.MOVE_RESULT_OBJECT,
-        Opcode.INVOKE_STATIC,
-        Opcode.MOVE_RESULT,
-    ),
+    filters = listOf(
+        resourceLiteral(
+            type = ResourceType.STRING,
+            name = "total_time"
+        ),
+        methodCall(
+            smali = "Landroid/content/res/Resources;->getString(I[Ljava/lang/Object;)Ljava/lang/String;"
+        ),
+        opcode(Opcode.MOVE_RESULT_OBJECT, MatchAfterImmediately())
+    )
 )
 
 val SponsorBarRect = findFieldDirect {
