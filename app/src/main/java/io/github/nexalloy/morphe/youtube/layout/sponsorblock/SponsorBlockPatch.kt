@@ -38,7 +38,7 @@ import io.github.nexalloy.morphe.youtube.video.information.VideoInformationPatch
 import io.github.nexalloy.morphe.youtube.video.information.onCreateHook
 import io.github.nexalloy.morphe.youtube.video.information.videoTimeHooks
 import io.github.nexalloy.morphe.youtube.video.videoid.VideoId
-import io.github.nexalloy.morphe.youtube.video.videoid.backgroundVideoIdHooks
+import io.github.nexalloy.morphe.youtube.video.videoid.hookBackgroundPlayVideoId
 import io.github.nexalloy.patch
 import io.github.nexalloy.scopedHook
 import org.luckypray.dexkit.wrap.DexMethod
@@ -59,8 +59,6 @@ val SponsorBlock = patch(
     )
 
     PreferenceScreen.SPONSORBLOCK.addPreferences(
-        // SB setting is old code with lots of custom preferences and updating behavior.
-        // Added as a preference group and not a fragment so the preferences are searchable.
         SwitchPreference("morphe_sb_enabled", summary = true),
         PreferenceCategory(
             key = "morphe_sb_appearance_category",
@@ -149,7 +147,7 @@ val SponsorBlock = patch(
         PreferenceCategory(
             key = "morphe_sb_stats",
             sorting = PreferenceScreenPreference.Sorting.UNSORTED,
-            preferences = emptySet(), // Preferences are added by custom class at runtime.
+            preferences = emptySet(),
             tag = SponsorBlockStatsPreferenceCategory::class.java
         ),
         PreferenceCategory(
@@ -171,15 +169,12 @@ val SponsorBlock = patch(
         R.id.morphe_sb_create_segment_button
     )
 
-    // Hook the video time methods.
     videoTimeHooks.add { YouTubeSponsorBlockConfig.setVideoTime(it) }
-    backgroundVideoIdHooks.add { YouTubeSponsorBlockConfig.setCurrentVideoId(it) }
+    hookBackgroundPlayVideoId(YouTubeSponsorBlockConfig::setCurrentVideoId)
 
-    // Seekbar drawing.
     ::seekbarOnDrawFingerprint.hookMethod {
         val sponsorBarRectField = ::SponsorBarRect.field
         before { param ->
-            // Get left and right of seekbar rectangle.
             YouTubeSponsorBlockConfig.setSeekbarRectangle(sponsorBarRectField.get(param.thisObject) as Rect)
         }
     }
@@ -190,14 +185,11 @@ val SponsorBlock = patch(
             "Landroid/graphics/RecordingCanvas;->drawCircle(FFFLandroid/graphics/Paint;)V"
     ::seekbarOnDrawFingerprint.hookMethod(
         scopedHook(
-            // The upstream patch uses the MOVE_RESULT immediately following Math.round(F)
-            // as the segment thickness. Capture the same value at runtime.
             DexMethod("Ljava/lang/Math;->round(F)I").toMethod() to {
                 after { param ->
                     YouTubeSponsorBlockConfig.setSeekbarThickness(param.result as Int)
                 }
             },
-            // Find the drawCircle call and draw the segment before it.
             DexMethod(drawCircle).toMethod() to {
                 before { param ->
                     YouTubeSponsorBlockConfig.drawSegmentTimeBars(
@@ -208,7 +200,6 @@ val SponsorBlock = patch(
         )
     )
 
-    // Change visibility of the buttons.
     initializeTopControl(
         ControlInitializer(
             R.id.morphe_sb_create_segment_button,
@@ -222,8 +213,6 @@ val SponsorBlock = patch(
         )
     )
 
-    // Append the new time to the player layout at the same Resources.getString call
-    // used by the bytecode patch, rather than rewriting an unrelated input argument.
     AppendTimeFingerprint.hookMethod(
         scopedHook(
             DexMethod("Landroid/content/res/Resources;->getString(I[Ljava/lang/Object;)Ljava/lang/String;").toMember()
@@ -235,10 +224,8 @@ val SponsorBlock = patch(
         }
     )
 
-    // Initialize the player controller.
     onCreateHook.add { YouTubeSponsorBlockConfig.initialize(it) }
 
-    // Initialize the SponsorBlock view.
     val controls_overlay_layout =
         ResourceUtils.getLayoutIdentifier("size_adjustable_youtube_controls_overlay")
     ::controlsOverlayFingerprint.hookMethod(scopedHook(DexMethod("Landroid/view/LayoutInflater;->inflate(ILandroid/view/ViewGroup;)Landroid/view/View;").toMember()) {
