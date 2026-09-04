@@ -26,14 +26,13 @@ val HideAds = patch(
         LithoFilter,
         EngagementPanelHook,
         HideHorizontalShelves,
-
         HideFullscreenAds(PreferenceScreen.ADS),
         VersionCheck,
     )
 
     PreferenceScreen.ADS.addPreferences(
         SwitchPreference("morphe_hide_creator_store_shelf"),
-//        SwitchPreference("morphe_hide_end_screen_store_banner"),
+        SwitchPreference("morphe_hide_end_screen_store_banner"),
         SwitchPreference("morphe_hide_general_ads"),
         SwitchPreference("morphe_hide_merchandise_banners"),
         SwitchPreference("morphe_hide_paid_promotion_labels"),
@@ -47,27 +46,29 @@ val HideAds = patch(
     addLithoFilter(AdsFilter())
     addEngagementPanelIdHook(AdsFilter::hidePlayerPopupAds)
 
-    // Hide video ads
-
     setOf(
         LoadVideoAdsFingerprint,
         PlayerBytesAdLayoutFingerprint,
     ).forEach { fingerprint ->
         fingerprint.hookMethod {
             before {
-                if (AdsFilter.hideVideoAds())
-                    it.result = null
+                if (AdsFilter.hideVideoAds()) it.result = null
             }
         }
     }
 
-    // TODO BuildClientContextBody
+    FullScreenEngagementAdContainerFingerprint.hookMethod(
+        scopedHook(::fullScreenEngagementAdAddMethod.member) {
+            before { param ->
+                if (innerDepth != 0) return@before
+                @Suppress("UNCHECKED_CAST")
+                val elements = param.thisObject as MutableList<Any?>
+                AdsFilter.hideEndScreenStoreBanner(elements, param.args[0])
+                param.result = true
+            }
+        }
+    )
 
-    // TODO: Hide YouTube Premium promotions
-
-    // TODO: Hide end screen store banner
-
-    // Hide get premium
     GetPremiumViewFingerprint.hookMethod {
         after {
             if (AdsFilter.hideGetPremiumView()) {
@@ -77,9 +78,6 @@ val HideAds = patch(
         }
     }
 
-    // Hide player overlay view. This can be hidden with a regular litho filter
-    // but an empty space remains.
-
     PlayerOverlayTimelyShelfFingerprint.hookMethod {
         val playerOverlayEventClass = ::PlayerOverlayEventType.clazz
         val playerOverlayIdField = ::PlayerOverlayIdField.field
@@ -87,16 +85,12 @@ val HideAds = patch(
             val obj = it.args[0]
             if (playerOverlayEventClass.isInstance(obj)) {
                 val id = playerOverlayIdField.get(obj) as String
-
-                if (!AdsFilter.allowAds(id == "player_overlay_timely_shelf"))
-                    it.result = null
+                if (!AdsFilter.allowAds(id == "player_overlay_timely_shelf")) it.result = null
             }
         }
     }
 
-    // Hide ad views
     val adAttributionId = ResourceUtils.getIdIdentifier("ad_attribution")
-
     XposedHelpers.findAndHookMethod(
         View::class.java.name,
         lpparam.classLoader,
@@ -112,7 +106,6 @@ val HideAds = patch(
             }
         })
 
-    // Hide paid promotion label in miniplayer
     val miniplayerSubtitleId = ResourceUtils.getIdIdentifier("modern_miniplayer_subtitle_text")
     MiniplayerPaidPromotionLabelFingerprint.hookMethod(
         scopedHook(::miniplayerPaidPromotionViewMethod.member) {
@@ -122,9 +115,4 @@ val HideAds = patch(
             }
         }
     )
-
-    // TODO [AdsFilter.hideAds] OsNameHook
-    // TODO [AdsFilter.hideVideoAds] OsNameHook
-    // TODO [AdsFilter.overrideGuideOSName] OsNameHook
-
 }
