@@ -176,13 +176,11 @@ val SponsorBlock = patch(
     videoTimeHooks.add { YouTubeSponsorBlockConfig.setVideoTime(it) }
     backgroundVideoIdHooks.add { YouTubeSponsorBlockConfig.setCurrentVideoId(it) }
 
-    // Seekbar drawing
-    var rectSetOnce = false
+    // Seekbar drawing.
     ::seekbarOnDrawFingerprint.hookMethod {
         val sponsorBarRectField = ::SponsorBarRect.field
         before { param ->
             // Get left and right of seekbar rectangle.
-            rectSetOnce = false
             YouTubeSponsorBlockConfig.setSeekbarRectangle(sponsorBarRectField.get(param.thisObject) as Rect)
         }
     }
@@ -193,13 +191,11 @@ val SponsorBlock = patch(
             "Landroid/graphics/RecordingCanvas;->drawCircle(FFFLandroid/graphics/Paint;)V"
     ::seekbarOnDrawFingerprint.hookMethod(
         scopedHook(
-            // Set the thickness of the segment.
-            DexMethod("Landroid/graphics/Rect;->set(IIII)V").toMethod() to {
+            // The upstream patch uses the MOVE_RESULT immediately following Math.round(F)
+            // as the segment thickness. Capture the same value at runtime.
+            DexMethod("Ljava/lang/Math;->round(F)I").toMethod() to {
                 after { param ->
-                    // Only the first call to Rect.set from onDraw sets the segment thickness.
-                    if (rectSetOnce) return@after
-                    YouTubeSponsorBlockConfig.setSeekbarThickness((param.thisObject as Rect).height())
-                    rectSetOnce = true
+                    YouTubeSponsorBlockConfig.setSeekbarThickness(param.result as Int)
                 }
             },
             // Find the drawCircle call and draw the segment before it.
