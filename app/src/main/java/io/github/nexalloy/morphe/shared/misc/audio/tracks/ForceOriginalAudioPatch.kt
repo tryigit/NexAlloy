@@ -9,9 +9,6 @@ import io.github.nexalloy.morphe.shared.misc.settings.preference.SwitchPreferenc
 import io.github.nexalloy.morphe.youtube.insertLiteralOverride
 import io.github.nexalloy.patch
 
-/**
- * Patch shared with YouTube and YT Music.
- */
 internal fun forceOriginalAudioPatch(
     block: PatchExecutor.() -> Unit = {},
     executeBlock: PatchExecutor.() -> Unit = {},
@@ -51,8 +48,6 @@ internal fun forceOriginalAudioPatch(
         }
     }
 
-    // Upstream invokes the app-specific subclass at the start of MainActivity.onCreate().
-    // This initializes the spoof-client locale workaround used by Force Original Audio.
     val subclassExtensionClassName = subclassExtensionClassDescriptor
         .removePrefix("L")
         .removeSuffix(";")
@@ -66,8 +61,6 @@ internal fun forceOriginalAudioPatch(
         }
     }
 
-    // Disable feature flag that ignores the default track flag
-    // and instead overrides to the user region language.
     if (fixUseLocalizedAudioTrackFlag()) {
         insertLiteralOverride(
             AUDIO_STREAM_IGNORE_DEFAULT_FEATURE_FLAG,
@@ -75,14 +68,44 @@ internal fun forceOriginalAudioPatch(
         )
     }
 
-    // If there is no feature flag, the SABR protocol parameter (proto buffer) must be overridden:
-    // https://github.com/LuanRT/googlevideo/commit/173a2b0717c19c922e5fb53b170640a9c9d58819
-    //
-    // Since mapping the proto field and finding the appropriate hooking point is very difficult,
-    // 'Default audio track' patches has been implemented (like 'Default video quality' patches).
+    if (forcedServerAdaptiveStreaming()) {
+        val idField = ::audioTrackIdField.field.apply { isAccessible = true }
+        val displayNameField = ::audioTrackDisplayNameField.field.apply { isAccessible = true }
+        val isDefaultField = ::audioTrackIsDefaultField.field.apply { isAccessible = true }
+        val trackArrayField = ::audioTrackRecordArrayField.field.apply { isAccessible = true }
+        val setAudioTrack = ::setAudioTrackMethod.method.apply { isAccessible = true }
+        val setVideoQualityList = ::setVideoQualityListMethod.method
+        val playerControllerField = setVideoQualityList.declaringClass.declaredFields
+            .filter { it.type == setAudioTrack.declaringClass }
+            .single()
+            .apply { isAccessible = true }
 
-    // TODO Runtime port for the 21.26+ forced-SABR default-track selection path.
-    forcedServerAdaptiveStreaming()
+        ::setVideoQualityListMethod.hookMethod {
+            before { param ->
+                val audioVideoFormat = param.args.firstOrNull() ?: return@before
+                val rawTracks = trackArrayField.get(audioVideoFormat) as? Array<*> ?: return@before
+                if (rawTracks.isEmpty() || rawTracks.any { it == null }) return@before
+
+                val tracks = Array(rawTracks.size) { index ->
+                    val record = rawTracks[index]!!
+                    object : ForceOriginalAudioPatch.AudioTrackInterface {
+                        override fun patch_getDisplayName(): String =
+                            displayNameField.get(record) as String
+
+                        override fun patch_getId(): String =
+                            idField.get(record) as String
+
+                        override fun patch_getIsDefault(): Boolean =
+                            isDefaultField.getBoolean(record)
+                    }
+                }
+
+                val trackId = ForceOriginalAudioPatch.getDefaultAudioTrackId(tracks) ?: return@before
+                val playerController = playerControllerField.get(param.thisObject) ?: return@before
+                setAudioTrack.invoke(playerController, trackId)
+            }
+        }
+    }
 
     executeBlock()
 }
