@@ -12,6 +12,7 @@ import io.github.nexalloy.morphe.youtube.misc.litho.filter.LithoFilter
 import io.github.nexalloy.morphe.youtube.misc.litho.observer.LayoutReloadObserver
 import io.github.nexalloy.morphe.youtube.misc.settings.PreferenceScreen
 import io.github.nexalloy.patch
+import java.util.ArrayDeque
 
 val HideShortsComponents = patch(
     name = "Hide Shorts components",
@@ -119,12 +120,24 @@ val HideShortsComponents = patch(
     RenderNextUIFeatureFlagFingerprint.hookMethod(XC_MethodReplacement.returnConstant(false))
     // endregion
 
+    val originalDoubleTapValues = ThreadLocal<ArrayDeque<Boolean>>()
     DoubleTapToLikeLogicFingerprint.hookMethod {
         val doubleTapField = ::isDoubleTapField.field
         before {
-            val originalValue = doubleTapField.get(it.thisObject) as Boolean
-            val newValue = ShortsFilter.allowDoubleTapToLike(originalValue)
-            doubleTapField.set(it.thisObject, newValue)
+            val originalValue = doubleTapField.getBoolean(it.thisObject)
+            val stack = originalDoubleTapValues.get()
+                ?: ArrayDeque<Boolean>().also(originalDoubleTapValues::set)
+            stack.addLast(originalValue)
+            doubleTapField.setBoolean(
+                it.thisObject,
+                ShortsFilter.allowDoubleTapToLike(originalValue)
+            )
+        }
+        after {
+            val stack = originalDoubleTapValues.get() ?: return@after
+            val originalValue = stack.pollLast() ?: return@after
+            doubleTapField.setBoolean(it.thisObject, originalValue)
+            if (stack.isEmpty()) originalDoubleTapValues.remove()
         }
     }
 }
