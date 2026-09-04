@@ -39,7 +39,7 @@ import io.github.nexalloy.morphe.youtube.video.information.VideoInformationPatch
 import io.github.nexalloy.morphe.youtube.video.information.onCreateHook
 import io.github.nexalloy.morphe.youtube.video.information.videoTimeHooks
 import io.github.nexalloy.morphe.youtube.video.videoid.VideoId
-import io.github.nexalloy.morphe.youtube.video.videoid.videoIdHooks
+import io.github.nexalloy.morphe.youtube.video.videoid.backgroundVideoIdHooks
 import io.github.nexalloy.patch
 import io.github.nexalloy.scopedHook
 import org.luckypray.dexkit.wrap.DexMethod
@@ -174,7 +174,7 @@ val SponsorBlock = patch(
 
     // Hook the video time methods.
     videoTimeHooks.add { YouTubeSponsorBlockConfig.setVideoTime(it) }
-    videoIdHooks.add { YouTubeSponsorBlockConfig.setCurrentVideoId(it) }
+    backgroundVideoIdHooks.add { YouTubeSponsorBlockConfig.setCurrentVideoId(it) }
 
     // Seekbar drawing
     var rectSetOnce = false
