@@ -7,6 +7,8 @@ import io.github.nexalloy.morphe.Opcode
 import io.github.nexalloy.morphe.ResourceType
 import io.github.nexalloy.morphe.fieldAccess
 import io.github.nexalloy.morphe.findClassDirect
+import io.github.nexalloy.morphe.findFieldDirect
+import io.github.nexalloy.morphe.findMethodDirect
 import io.github.nexalloy.morphe.findMethodListDirect
 import io.github.nexalloy.morphe.fingerprint
 import io.github.nexalloy.morphe.methodCall
@@ -73,6 +75,18 @@ internal object AudioTrackRecordToStringFingerprint : Fingerprint(
     )
 )
 
+internal val audioTrackIdField = findFieldDirect {
+    AudioTrackRecordToStringFingerprint.instructionMatches[0].instruction.fieldRef!!
+}
+
+internal val audioTrackDisplayNameField = findFieldDirect {
+    AudioTrackRecordToStringFingerprint.instructionMatches[1].instruction.fieldRef!!
+}
+
+internal val audioTrackIsDefaultField = findFieldDirect {
+    AudioTrackRecordToStringFingerprint.instructionMatches[3].instruction.fieldRef!!
+}
+
 private object AudioTrackItemOnClickParentFingerprint : Fingerprint(
     parameters = emptyList(),
     returnType = "Ljava/lang/String;",
@@ -86,7 +100,7 @@ private object AudioTrackItemOnClickParentFingerprint : Fingerprint(
     )
 )
 
-internal fun getAudioTrackItemOnClickFingerprint(audioTrackRecordClass: String) = Fingerprint(
+private fun getAudioTrackItemOnClickFingerprint(audioTrackRecordClass: String) = Fingerprint(
     classFingerprint = AudioTrackItemOnClickParentFingerprint,
     name = "onItemClick",
     returnType = "V",
@@ -104,6 +118,12 @@ internal fun getAudioTrackItemOnClickFingerprint(audioTrackRecordClass: String) 
     )
 )
 
+internal val setAudioTrackMethod = findMethodDirect {
+    val audioTrackRecordClass = AudioTrackRecordToStringFingerprint().declaredClass!!.descriptor
+    getAudioTrackItemOnClickFingerprint(audioTrackRecordClass)
+        .instructionMatches.last().instruction.methodRef!!
+}
+
 private object CurrentAudioVideoFormatToStringFingerprint : Fingerprint(
     name = "toString",
     accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.FINAL),
@@ -112,7 +132,7 @@ private object CurrentAudioVideoFormatToStringFingerprint : Fingerprint(
     strings = listOf("currentVideoFormat=")
 )
 
-internal fun getCurrentAudioFormatConstructorFingerprint(audioTrackRecordClass: String) = Fingerprint(
+private fun getCurrentAudioFormatConstructorFingerprint(audioTrackRecordClass: String) = Fingerprint(
     classFingerprint = CurrentAudioVideoFormatToStringFingerprint,
     name = "<init>",
     returnType = "V",
@@ -125,7 +145,13 @@ internal fun getCurrentAudioFormatConstructorFingerprint(audioTrackRecordClass: 
     )
 )
 
-internal fun getSetVideoQualityListFingerprint(
+internal val audioTrackRecordArrayField = findFieldDirect {
+    val audioTrackRecordClass = AudioTrackRecordToStringFingerprint().declaredClass!!.descriptor
+    getCurrentAudioFormatConstructorFingerprint(audioTrackRecordClass)
+        .instructionMatches.last().instruction.fieldRef!!
+}
+
+private fun getSetVideoQualityListFingerprint(
     audioVideoFormatClass: String,
     playerControllerClass: String
 ) = Fingerprint(
@@ -147,5 +173,11 @@ internal fun getSetVideoQualityListFingerprint(
         }
     }
 )
+
+internal val setVideoQualityListMethod = findMethodDirect {
+    val audioVideoFormatClass = audioTrackRecordArrayField().declaredClass.descriptor
+    val playerControllerClass = setAudioTrackMethod().declaredClass!!.descriptor
+    getSetVideoQualityListFingerprint(audioVideoFormatClass, playerControllerClass)()
+}
 
 internal const val AUDIO_STREAM_IGNORE_DEFAULT_FEATURE_FLAG = 45666189L
