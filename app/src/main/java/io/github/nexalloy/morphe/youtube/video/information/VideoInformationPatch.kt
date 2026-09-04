@@ -224,14 +224,19 @@ val VideoInformationPatch = patch(
         }
     })
 
-    InitializePlaybackSpeedValuesFingerprint.declaredClass.constructors[0].hookMethod {
-        val playerControllerClass = ::PlayerControllerClass.clazz
+    val playbackSpeedMenuClass = InitializePlaybackSpeedValuesFingerprint.declaredClass
+    val playerControllerClass = ::PlayerControllerClass.clazz
+    val playbackSpeedMenuConstructor = playbackSpeedMenuClass.constructors.first {
+        it.parameterTypes.contains(playerControllerClass)
+    }
+    val playerControllerIndex =
+        playbackSpeedMenuConstructor.parameterTypes.indexOf(playerControllerClass)
+    playbackSpeedMenuConstructor.hookMethod {
         after {
-            val c = it.args.first { it.javaClass == playerControllerClass }
             XposedHelpers.setAdditionalInstanceField(
                 it.thisObject,
                 playerControllerFieldName,
-                c
+                it.args[playerControllerIndex]
             )
             VideoInformation.setPlaybackSpeedMenu(PlaybackSpeedMenu(it.thisObject))
         }
