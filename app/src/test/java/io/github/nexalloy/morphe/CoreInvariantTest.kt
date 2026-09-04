@@ -329,7 +329,9 @@ class CoreInvariantTest {
     @Test
     fun reflectiveClassLookupUnwrapsExpectedMisses() {
         val loader = MissingClassLoader()
-        val method = MissingClassLoader::class.java.getDeclaredMethod("lookup", String::class.java)
+        val method = MissingClassLoader::class.java
+            .getDeclaredMethod("lookup", String::class.java)
+            .apply { isAccessible = true }
         val error = assertThrows(ClassNotFoundException::class.java) {
             invokeFindClass(method, loader, "missing.Type")
         }
@@ -339,7 +341,9 @@ class CoreInvariantTest {
     @Test
     fun reflectiveClassLookupPreservesUnexpectedFailures() {
         val loader = BrokenClassLoader()
-        val method = BrokenClassLoader::class.java.getDeclaredMethod("lookup", String::class.java)
+        val method = BrokenClassLoader::class.java
+            .getDeclaredMethod("lookup", String::class.java)
+            .apply { isAccessible = true }
         val error = assertThrows(IllegalStateException::class.java) {
             invokeFindClass(method, loader, "broken.Type")
         }
