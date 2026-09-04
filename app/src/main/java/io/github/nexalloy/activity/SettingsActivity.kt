@@ -66,6 +66,7 @@ class SettingsActivity : Activity(), SettingApplication.ServiceStateListener {
 
     override fun onServiceStateChanged(service: XposedService?) {
         mService = service
+        invalidateOptionsMenu()
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -80,13 +81,15 @@ class SettingsActivity : Activity(), SettingApplication.ServiceStateListener {
             packageManager.getComponentEnabledSetting(aliasName) == PackageManager.COMPONENT_ENABLED_STATE_DISABLED
 
         val menuDisableAutoCheck = menu.findItem(R.id.menu_disable_auto_check)
-        try {
-            val prefs = mService!!.getRemotePreferences("prefs")
-            menuDisableAutoCheck.isChecked =
-                prefs.getBoolean("disable_auto_check_update", false)
-            menuDisableAutoCheck.isVisible = true
-        } catch (_: Throwable) {
-            menuDisableAutoCheck.isVisible = false
+        val autoCheckDisabled = try {
+            mService?.getRemotePreferences("prefs")
+                ?.getBoolean("disable_auto_check_update", false)
+        } catch (_: RuntimeException) {
+            null
+        }
+        menuDisableAutoCheck.isVisible = autoCheckDisabled != null
+        if (autoCheckDisabled != null) {
+            menuDisableAutoCheck.isChecked = autoCheckDisabled
         }
         return true
     }
@@ -114,9 +117,19 @@ class SettingsActivity : Activity(), SettingApplication.ServiceStateListener {
 
             R.id.menu_disable_auto_check -> {
                 val newChecked = !item.isChecked
-                item.isChecked = newChecked
-                mService!!.getRemotePreferences("prefs")
-                    .edit().putBoolean("disable_auto_check_update", newChecked).apply()
+                val saved = try {
+                    val service = mService ?: throw IllegalStateException("Xposed service unavailable")
+                    service.getRemotePreferences("prefs")
+                        .edit().putBoolean("disable_auto_check_update", newChecked).apply()
+                    true
+                } catch (_: RuntimeException) {
+                    false
+                }
+                if (saved) {
+                    item.isChecked = newChecked
+                } else {
+                    item.isVisible = false
+                }
                 true
             }
 
@@ -243,23 +256,20 @@ class SettingsActivity : Activity(), SettingApplication.ServiceStateListener {
 
         override fun onServiceStateChanged(service: XposedService?) {
             mService = service
-
-            activity?.runOnUiThread {
-                if (service == null) {
-                    updateDynamicUI(false)
-                    return@runOnUiThread
-                }
-
-                val isModuleActivated: Boolean = try {
-                    service.getRemotePreferences("prefs")
-                    service.apiVersion
-                    true
-                } catch (_: Throwable) {
-                    false
-                }
-
-                updateDynamicUI(isModuleActivated)
+            if (service == null) {
+                updateDynamicUI(false)
+                return
             }
+
+            val isModuleActivated = try {
+                service.getRemotePreferences("prefs")
+                service.apiVersion
+                true
+            } catch (_: RuntimeException) {
+                false
+            }
+
+            updateDynamicUI(isModuleActivated)
         }
     }
 }
