@@ -6,6 +6,7 @@ import io.github.nexalloy.morphe.InstructionLocation
 import io.github.nexalloy.morphe.Opcode
 import io.github.nexalloy.morphe.StringComparisonType
 import io.github.nexalloy.morphe.checkCast
+import io.github.nexalloy.morphe.findMethodDirect
 import io.github.nexalloy.morphe.literal
 import io.github.nexalloy.morphe.methodCall
 import io.github.nexalloy.morphe.opcode
@@ -55,3 +56,7 @@ internal object UserWasInShortsListenerFingerprint : Fingerprint(
         string("ShortsStartup SetUserWasInShortsListener", StringComparisonType.CONTAINS, InstructionLocation.MatchAfterWithin(30))
     )
 )
+
+val userWasInShortsBooleanValueMethod = findMethodDirect {
+    UserWasInShortsListenerFingerprint.instructionMatches[1].instruction.methodRef!!
+}
