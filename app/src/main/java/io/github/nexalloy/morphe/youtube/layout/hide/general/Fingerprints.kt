@@ -5,11 +5,77 @@ import io.github.nexalloy.morphe.Fingerprint
 import io.github.nexalloy.morphe.InstructionLocation.MatchAfterImmediately
 import io.github.nexalloy.morphe.InstructionLocation.MatchAfterWithin
 import io.github.nexalloy.morphe.Opcode
+import io.github.nexalloy.morphe.ResourceType
 import io.github.nexalloy.morphe.StringComparisonType
 import io.github.nexalloy.morphe.findMethodDirect
 import io.github.nexalloy.morphe.methodCall
+import io.github.nexalloy.morphe.newInstance
 import io.github.nexalloy.morphe.opcode
+import io.github.nexalloy.morphe.resourceLiteral
 import io.github.nexalloy.morphe.string
+
+/**
+ * 20.21+
+ *
+ * Restrict the generic parent_container id to the subscribed-channels constructor.
+ */
+internal object HideSubscribedChannelsBarConstructorFingerprint : Fingerprint(
+    accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.CONSTRUCTOR),
+    filters = listOf(
+        resourceLiteral(ResourceType.ID, "parent_container"),
+        methodCall(
+            opcode = Opcode.INVOKE_VIRTUAL,
+            name = "findViewById",
+            location = MatchAfterWithin(2)
+        ),
+        opcode(Opcode.MOVE_RESULT_OBJECT, location = MatchAfterImmediately()),
+        newInstance(
+            "Landroid/widget/LinearLayout\$LayoutParams;",
+            location = MatchAfterWithin(5)
+        )
+    )
+)
+
+internal object HideSubscribedChannelsBarLandscapeFingerprint : Fingerprint(
+    classFingerprint = HideSubscribedChannelsBarConstructorFingerprint,
+    returnType = "V",
+    parameters = listOf(),
+    filters = listOf(
+        resourceLiteral(ResourceType.DIMEN, "parent_view_width_in_wide_mode"),
+        methodCall(
+            opcode = Opcode.INVOKE_VIRTUAL,
+            name = "getDimensionPixelSize",
+            returnType = "I"
+        ),
+        opcode(Opcode.MOVE_RESULT, location = MatchAfterImmediately()),
+    )
+)
+
+internal object LatestVideosContentPillFingerprint : Fingerprint(
+    accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.FINAL),
+    returnType = "V",
+    parameters = listOf("L", "Z"),
+    filters = listOf(
+        resourceLiteral(ResourceType.LAYOUT, "content_pill"),
+        methodCall(
+            smali = "Landroid/view/LayoutInflater;->inflate(ILandroid/view/ViewGroup;Z)Landroid/view/View;"
+        ),
+        opcode(Opcode.MOVE_RESULT_OBJECT, location = MatchAfterImmediately())
+    )
+)
+
+internal object LatestVideosBarFingerprint : Fingerprint(
+    accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.FINAL),
+    returnType = "V",
+    parameters = listOf("L", "Z"),
+    filters = listOf(
+        resourceLiteral(ResourceType.LAYOUT, "bar"),
+        methodCall(
+            smali = "Landroid/view/LayoutInflater;->inflate(ILandroid/view/ViewGroup;Z)Landroid/view/View;"
+        ),
+        opcode(Opcode.MOVE_RESULT_OBJECT, location = MatchAfterImmediately())
+    )
+)
 
 internal object ParseElementFromBufferFingerprint : Fingerprint(
     parameters = listOf("L", "L", "[B", "L", "L"),
