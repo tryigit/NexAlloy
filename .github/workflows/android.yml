@@ -93,9 +93,11 @@ jobs:
         LATEST_REL=$(gh release view --json tagName -q .tagName)
         GIT_DESCRIBE=$(git rev-parse --short HEAD)
         cd app/build/outputs/apk/release/
-        mv app-release.apk NexAlloy-${GIT_DESCRIBE}.apk
-        gh release delete autobuild --yes || true
-        gh release create autobuild NexAlloy-${GIT_DESCRIBE}.apk \
+        mv app-release.apk "NexAlloy-${GIT_DESCRIBE}.apk"
+        gh release delete autobuild --cleanup-tag --yes || true
+        gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/refs/tags/autobuild" >/dev/null 2>&1 || true
+        gh release create autobuild "NexAlloy-${GIT_DESCRIBE}.apk" \
+          --target "$GITHUB_SHA" \
           --prerelease \
           --title "Nightly Build ${GIT_DESCRIBE}" \
           --notes "Nightly build from commit ${GIT_DESCRIBE}. See changes: https://github.com/${{ github.repository }}/compare/${LATEST_REL}...main"
