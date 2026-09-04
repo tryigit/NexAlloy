@@ -1,7 +1,9 @@
 package io.github.nexalloy.morphe
 
+import io.github.nexalloy.AppVersion
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
@@ -28,5 +30,43 @@ class CoreInvariantTest {
         assertTrue(isVersionAtLeast("21.02.0", "21.02.000"))
         assertTrue(isVersionAtLeast("21.32", "21.32.0"))
         assertFalse(isVersionAtLeast("2026.3.9", "2026.04.0"))
+    }
+
+    @Test
+    fun appVersionNormalizesMissingParts() {
+        assertEquals(0, AppVersion("21.35").compareTo(AppVersion("21.35.0")))
+        assertTrue(AppVersion("10.0") > AppVersion("9.999.999"))
+        assertTrue(AppVersion("9999999999.0") > AppVersion("2147483647.999"))
+    }
+
+    @Test
+    fun matchFirstOnlyAcceptsMethodStart() {
+        val location = InstructionLocation.MatchFirst()
+        assertTrue(location.indexIsValidForMatching(-1, 0))
+        assertFalse(location.indexIsValidForMatching(-1, 1))
+        assertThrows(IllegalArgumentException::class.java) {
+            location.indexIsValidForMatching(0, 1)
+        }
+    }
+
+    @Test
+    fun matchAfterWithinRequiresPreviousMatch() {
+        val location = InstructionLocation.MatchAfterWithin(2)
+        assertTrue(location.indexIsValidForMatching(3, 4))
+        assertTrue(location.indexIsValidForMatching(3, 6))
+        assertFalse(location.indexIsValidForMatching(3, 7))
+        assertThrows(IllegalArgumentException::class.java) {
+            location.indexIsValidForMatching(-1, 0)
+        }
+    }
+
+    @Test
+    fun matchAfterRangeSupportsFirstFilter() {
+        val location = InstructionLocation.MatchAfterRange(2, 4)
+        assertFalse(location.indexIsValidForMatching(-1, 1))
+        assertTrue(location.indexIsValidForMatching(-1, 2))
+        assertTrue(location.indexIsValidForMatching(-1, 4))
+        assertFalse(location.indexIsValidForMatching(-1, 5))
+        assertTrue(location.indexIsValidForMatching(10, 13))
     }
 }
