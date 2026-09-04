@@ -31,7 +31,15 @@ jobs:
       run: ./gradlew testDebugUnitTest --tests 'io.github.nexalloy.morphe.CoreInvariantTest'
 
     - name: Lint
-      run: ./gradlew lintDebug
+      run: |
+        if ! ./gradlew lintDebug; then
+          report='app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt'
+          if [ -f "$report" ]; then
+            printf '\n===== Full lint report =====\n'
+            cat "$report"
+          fi
+          exit 1
+        fi
 
     - name: Build Debug
       run: ./gradlew assembleDebug
