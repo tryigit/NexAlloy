@@ -26,7 +26,7 @@ fun addLithoFilter(filter: Filter){
  * The pathBuilder is used to filter components by their path.
  *
  * Additionally, the method contains a reference to the component's identifier.
- * The identifier is used to filter components by their identifier.
+ * The identifier is used to filter components by its identifier.
  *
  * The protobuf buffer is passed along from a different injection point before the filtering occurs.
  * The buffer is a large byte array that represents the component tree.
@@ -80,7 +80,7 @@ internal fun sharedLithoFilterPatch(
         .hookMethod(XC_MethodReplacement.returnConstant(useLegacyLithoFiltering()))
 
     //region Pass the buffer into extension.
-    if (!hookNonNativeBuffer()) {
+    if (hookNonNativeBuffer()) {
         // Non-native buffer.
         ProtobufBufferReferenceFingerprint.hookMethod {
             before { param ->
