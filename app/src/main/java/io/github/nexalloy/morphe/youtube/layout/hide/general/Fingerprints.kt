@@ -14,11 +14,6 @@ import io.github.nexalloy.morphe.opcode
 import io.github.nexalloy.morphe.resourceLiteral
 import io.github.nexalloy.morphe.string
 
-/**
- * 20.21+
- *
- * Restrict the generic parent_container id to the subscribed-channels constructor.
- */
 internal object HideSubscribedChannelsBarConstructorFingerprint : Fingerprint(
     accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.CONSTRUCTOR),
     filters = listOf(
@@ -36,6 +31,10 @@ internal object HideSubscribedChannelsBarConstructorFingerprint : Fingerprint(
     )
 )
 
+val subscribedChannelsFindViewByIdMethod = findMethodDirect {
+    HideSubscribedChannelsBarConstructorFingerprint.instructionMatches[1].instruction.methodRef!!
+}
+
 internal object HideSubscribedChannelsBarLandscapeFingerprint : Fingerprint(
     classFingerprint = HideSubscribedChannelsBarConstructorFingerprint,
     returnType = "V",
@@ -50,6 +49,10 @@ internal object HideSubscribedChannelsBarLandscapeFingerprint : Fingerprint(
         opcode(Opcode.MOVE_RESULT, location = MatchAfterImmediately()),
     )
 )
+
+val subscribedChannelsGetDimensionPixelSizeMethod = findMethodDirect {
+    HideSubscribedChannelsBarLandscapeFingerprint.instructionMatches[1].instruction.methodRef!!
+}
 
 internal object LatestVideosContentPillFingerprint : Fingerprint(
     accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.FINAL),
@@ -77,11 +80,20 @@ internal object LatestVideosBarFingerprint : Fingerprint(
     )
 )
 
+val latestVideosInflateMethod = findMethodDirect {
+    val methods = listOf(
+        LatestVideosContentPillFingerprint,
+        LatestVideosBarFingerprint
+    ).map { fingerprint ->
+        fingerprint.instructionMatches[1].instruction.methodRef!!
+    }.distinctBy { it.descriptor }
+    methods.single()
+}
+
 internal object ParseElementFromBufferFingerprint : Fingerprint(
     parameters = listOf("L", "L", "[B", "L", "L"),
     filters = listOf(
         opcode(Opcode.IGET_OBJECT),
-        // IGET_BOOLEAN // 20.07+
         opcode(Opcode.INVOKE_INTERFACE, location = MatchAfterWithin(1)),
         opcode(Opcode.MOVE_RESULT_OBJECT, location = MatchAfterImmediately()),
         string("Failed to parse Element", StringComparisonType.STARTS_WITH),
