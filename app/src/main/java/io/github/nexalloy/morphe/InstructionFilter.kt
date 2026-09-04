@@ -1112,7 +1112,7 @@ fun instanceOf(
 fun instanceOf(
     type: () -> String,
     location: InstructionLocation = InstructionLocation.MatchAfterAnywhere()
-) = CheckCastFilter(type, location)
+) = InstanceOfFilter(type, location)
 
 /**
  * Opcode type [Opcode.INSTANCE_OF] with a non obfuscated class type.
@@ -1125,7 +1125,7 @@ fun instanceOf(
     type: String,
     comparison: StringComparisonType,
     location: InstructionLocation = InstructionLocation.MatchAfterAnywhere()
-) = CheckCastFilter({ type }, location)
+) = InstanceOfFilter({ type }, location)
 
 /**
  * Opcode type [Opcode.INSTANCE_OF] with a non obfuscated class type.
@@ -1138,7 +1138,7 @@ fun instanceOf(
     type: () -> String,
     comparison: StringComparisonType,
     location: InstructionLocation = InstructionLocation.MatchAfterAnywhere()
-) = CheckCastFilter(type, location)
+) = InstanceOfFilter(type, location)
 
 
 class CheckCastFilter internal constructor(
