@@ -1,6 +1,5 @@
 package io.github.nexalloy.morphe.reddit.misc.version
 
-import io.github.nexalloy.morphe.isVersionAtLeast
 import io.github.nexalloy.patch
 import kotlin.properties.Delegates
 
@@ -22,7 +21,7 @@ val VersionCheck = patch {
         .getPackageInfo(appContext.packageName, 0).versionName!!
 
     fun isEqualsOrGreaterThan(version: String): Boolean {
-        return isVersionAtLeast(versionName, version)
+        return versionName >= version
     }
 
     is_2025_48_0_or_greater = isEqualsOrGreaterThan("2025.48.0")
