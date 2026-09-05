@@ -21,6 +21,10 @@ val gitCommitDateProvider = providers.exec {
     workingDir = rootProject.rootDir
 }.standardOutput.asText!!
 
+val isGitHubActionsBuild = providers.environmentVariable("GITHUB_ACTIONS")
+    .map { it.equals("true", ignoreCase = true) }
+    .orElse(false)
+
 android {
     namespace = "io.github.nexalloy"
 
@@ -34,6 +38,7 @@ android {
         buildConfigField("String", "PATCH_VERSION", "\"$patchVersion\"")
         buildConfigField("String", "COMMIT_HASH", "\"${gitCommitHashProvider.get().trim()}\"")
         buildConfigField("long", "COMMIT_DATE", "${gitCommitDateProvider.get().trim()}L")
+        buildConfigField("boolean", "CI_BUILD", isGitHubActionsBuild.get().toString())
     }
     androidResources {
         additionalParameters += arrayOf("--allow-reserved-package-id", "--package-id", "0x4b")
@@ -152,6 +157,8 @@ dependencies {
     testImplementation(libs.junit.jupiter.params)
     testImplementation(libs.jadx.core)
     testImplementation(libs.slf4j.simple)
+    testImplementation(libs.xposed)
+    testImplementation(libs.libxposed.api)
     debugImplementation(kotlin("reflect"))
     compileOnly(libs.xposed)
     compileOnly(libs.libxposed.api)
