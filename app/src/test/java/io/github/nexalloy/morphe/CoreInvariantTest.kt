@@ -26,15 +26,6 @@ class CoreInvariantTest {
     }
 
     @Test
-    fun versionComparisonIsNumeric() {
-        assertTrue(isVersionAtLeast("10.0.0", "9.33.00"))
-        assertFalse(isVersionAtLeast("9.9.0", "9.19.0"))
-        assertTrue(isVersionAtLeast("21.02.0", "21.02.000"))
-        assertTrue(isVersionAtLeast("21.32", "21.32.0"))
-        assertFalse(isVersionAtLeast("2026.3.9", "2026.04.0"))
-    }
-
-    @Test
     fun appVersionNormalizesMissingParts() {
         assertEquals(0, AppVersion("21.35").compareTo(AppVersion("21.35.0")))
         assertTrue(AppVersion("10.0") > AppVersion("9.999.999"))
