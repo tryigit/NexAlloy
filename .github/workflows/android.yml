@@ -76,18 +76,39 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
-    - name: Write key
+    - name: Configure signing
       env:
         KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         KEYSTORE_ALIAS: ${{ secrets.KEYSTORE_ALIAS }}
         KEYSTORE_ALIAS_PASSWORD: ${{ secrets.KEYSTORE_ALIAS_PASSWORD }}
         KEYSTORE: ${{ secrets.KEYSTORE }}
       run: |
-        printf 'KEYSTORE_PASSWORD=%s\n' "$KEYSTORE_PASSWORD" > signing.properties
-        printf 'KEYSTORE_ALIAS=%s\n' "$KEYSTORE_ALIAS" >> signing.properties
-        printf 'KEYSTORE_ALIAS_PASSWORD=%s\n' "$KEYSTORE_ALIAS_PASSWORD" >> signing.properties
-        printf 'KEYSTORE_FILE=../key.jks\n' >> signing.properties
-        printf '%s' "$KEYSTORE" | base64 --decode > key.jks
+        if [ -n "$KEYSTORE" ] && [ -n "$KEYSTORE_PASSWORD" ] && [ -n "$KEYSTORE_ALIAS" ] && [ -n "$KEYSTORE_ALIAS_PASSWORD" ]; then
+          printf 'KEYSTORE_PASSWORD=%s\n' "$KEYSTORE_PASSWORD" > signing.properties
+          printf 'KEYSTORE_ALIAS=%s\n' "$KEYSTORE_ALIAS" >> signing.properties
+          printf 'KEYSTORE_ALIAS_PASSWORD=%s\n' "$KEYSTORE_ALIAS_PASSWORD" >> signing.properties
+          printf 'KEYSTORE_FILE=../key.jks\n' >> signing.properties
+          printf '%s' "$KEYSTORE" | base64 --decode > key.jks
+          echo 'DEV_SIGNED=false' >> "$GITHUB_ENV"
+        else
+          DEV_STORE_PASSWORD='nexalloy-dev'
+          DEV_ALIAS='nexalloy-fork'
+          DEV_KEY_PASSWORD='nexalloy-dev'
+          keytool -genkeypair \
+            -keystore key.jks \
+            -storepass "$DEV_STORE_PASSWORD" \
+            -alias "$DEV_ALIAS" \
+            -keypass "$DEV_KEY_PASSWORD" \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 3650 \
+            -dname 'CN=NexAlloy Fork Dev Build, OU=CI, O=tryigit, C=TR'
+          printf 'KEYSTORE_PASSWORD=%s\n' "$DEV_STORE_PASSWORD" > signing.properties
+          printf 'KEYSTORE_ALIAS=%s\n' "$DEV_ALIAS" >> signing.properties
+          printf 'KEYSTORE_ALIAS_PASSWORD=%s\n' "$DEV_KEY_PASSWORD" >> signing.properties
+          printf 'KEYSTORE_FILE=../key.jks\n' >> signing.properties
+          echo 'DEV_SIGNED=true' >> "$GITHUB_ENV"
+        fi
 
     - name: Build Release
       run: ./gradlew assembleRelease
@@ -104,12 +125,19 @@ jobs:
       run: |
         LATEST_REL=$(gh release view --json tagName -q .tagName 2>/dev/null || true)
         GIT_DESCRIBE=$(git rev-parse --short HEAD)
-        APK_NAME="NexAlloy-${GIT_DESCRIBE}.apk"
-        RELEASE_TITLE="Nightly Build ${GIT_DESCRIBE}"
-        if [ -n "$LATEST_REL" ]; then
-          RELEASE_NOTES="Nightly build from commit ${GIT_DESCRIBE}. See changes: https://github.com/${GITHUB_REPOSITORY}/compare/${LATEST_REL}...main"
+        if [ "$DEV_SIGNED" = 'true' ]; then
+          APK_NAME="NexAlloy-${GIT_DESCRIBE}-fork-dev.apk"
+          RELEASE_TITLE="Performance Fork Build ${GIT_DESCRIBE}"
+          SIGNING_NOTE=" This fork build is release-optimized but dev-signed with an ephemeral CI key; a later build may require uninstall/reinstall before installation."
         else
-          RELEASE_NOTES="Nightly build from commit ${GIT_DESCRIBE}."
+          APK_NAME="NexAlloy-${GIT_DESCRIBE}.apk"
+          RELEASE_TITLE="Nightly Build ${GIT_DESCRIBE}"
+          SIGNING_NOTE=""
+        fi
+        if [ -n "$LATEST_REL" ]; then
+          RELEASE_NOTES="Nightly build from commit ${GIT_DESCRIBE}. See changes: https://github.com/${GITHUB_REPOSITORY}/compare/${LATEST_REL}...main.${SIGNING_NOTE}"
+        else
+          RELEASE_NOTES="Nightly build from commit ${GIT_DESCRIBE}.${SIGNING_NOTE}"
         fi
 
         cd app/build/outputs/apk/release/
