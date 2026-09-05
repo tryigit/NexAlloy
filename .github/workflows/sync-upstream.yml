@@ -21,13 +21,15 @@ env:
 
 jobs:
   sync:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     steps:
-    - name: Check out fork
+    - name: Check out fork main
       uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
       with:
+        ref: main
         fetch-depth: 0
         submodules: true
         persist-credentials: true
@@ -80,12 +82,9 @@ jobs:
           --json number \
           --jq '.[0].number // empty')
 
-        body=$(cat <<'EOF'
-Automated upstream sync found merge conflicts with the fork's custom changes.
-
-The automation intentionally did **not** overwrite the fork. This branch points at the latest `NexAlloy/NexAlloy:main`; resolve this PR by preserving the fork-specific performance/runtime changes while accepting compatible upstream updates.
-EOF
-)
+        body=$(printf '%s\n\n%s\n' \
+          "Automated upstream sync found merge conflicts with the fork's custom changes." \
+          'The automation intentionally did **not** overwrite the fork. This branch points at the latest `NexAlloy/NexAlloy:main`; resolve this PR by preserving the fork-specific performance/runtime changes while accepting compatible upstream updates.')
 
         if [ -n "$pr_number" ]; then
           gh pr edit "$pr_number" --title 'Sync upstream NexAlloy/NexAlloy' --body "$body"
