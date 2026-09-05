@@ -1,0 +1,158 @@
+name: Sync Upstream
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 */3 * * *'
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: nexalloy-upstream-sync
+  cancel-in-progress: false
+
+env:
+  UPSTREAM_REPO: NexAlloy/NexAlloy
+  UPSTREAM_BRANCH: main
+  SYNC_BRANCH: upstream-sync
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+    - name: Check out fork
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        fetch-depth: 0
+        submodules: true
+        persist-credentials: true
+
+    - name: Fetch upstream
+      run: |
+        git config user.name 'github-actions[bot]'
+        git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+        git remote add upstream "https://github.com/${UPSTREAM_REPO}.git"
+        git fetch --prune upstream "${UPSTREAM_BRANCH}"
+
+    - name: Check whether sync is needed
+      id: detect
+      run: |
+        if git merge-base --is-ancestor "upstream/${UPSTREAM_BRANCH}" HEAD; then
+          echo 'needs_sync=false' >> "$GITHUB_OUTPUT"
+          echo 'Fork already contains the latest upstream commit.' >> "$GITHUB_STEP_SUMMARY"
+        else
+          echo 'needs_sync=true' >> "$GITHUB_OUTPUT"
+          echo "Upstream update detected: $(git rev-parse --short upstream/${UPSTREAM_BRANCH})" >> "$GITHUB_STEP_SUMMARY"
+        fi
+
+    - name: Merge upstream without overwriting fork history
+      if: steps.detect.outputs.needs_sync == 'true'
+      id: merge
+      run: |
+        set +e
+        git merge --no-edit --no-ff "upstream/${UPSTREAM_BRANCH}"
+        status=$?
+        set -e
+
+        if [ "$status" -eq 0 ]; then
+          echo 'conflict=false' >> "$GITHUB_OUTPUT"
+        else
+          git merge --abort
+          echo 'conflict=true' >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Open or refresh conflict PR
+      if: steps.detect.outputs.needs_sync == 'true' && steps.merge.outputs.conflict == 'true'
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        git push --force origin "upstream/${UPSTREAM_BRANCH}:refs/heads/${SYNC_BRANCH}"
+
+        pr_number=$(gh pr list \
+          --head "$SYNC_BRANCH" \
+          --base main \
+          --state open \
+          --json number \
+          --jq '.[0].number // empty')
+
+        body=$(cat <<'EOF'
+Automated upstream sync found merge conflicts with the fork's custom changes.
+
+The automation intentionally did **not** overwrite the fork. This branch points at the latest `NexAlloy/NexAlloy:main`; resolve this PR by preserving the fork-specific performance/runtime changes while accepting compatible upstream updates.
+EOF
+)
+
+        if [ -n "$pr_number" ]; then
+          gh pr edit "$pr_number" --title 'Sync upstream NexAlloy/NexAlloy' --body "$body"
+        else
+          gh pr create \
+            --head "$SYNC_BRANCH" \
+            --base main \
+            --title 'Sync upstream NexAlloy/NexAlloy' \
+            --body "$body"
+        fi
+
+        echo 'Merge conflict detected. Fork changes were left untouched and an upstream-sync PR was created/refreshed.' >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Set up JDK
+      if: steps.detect.outputs.needs_sync == 'true' && steps.merge.outputs.conflict == 'false'
+      uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: gradle
+
+    - name: Refresh merged submodules
+      if: steps.detect.outputs.needs_sync == 'true' && steps.merge.outputs.conflict == 'false'
+      run: |
+        git submodule sync --recursive
+        git submodule update --init --recursive --depth 1
+        chmod +x gradlew
+
+    - name: Verify fork invariants
+      if: steps.detect.outputs.needs_sync == 'true' && steps.merge.outputs.conflict == 'false'
+      run: ./gradlew testDebugUnitTest --tests 'io.github.nexalloy.morphe.CoreInvariantTest'
+
+    - name: Lint merged tree
+      if: steps.detect.outputs.needs_sync == 'true' && steps.merge.outputs.conflict == 'false'
+      run: ./gradlew lintDebug
+
+    - name: Build merged tree
+      if: steps.detect.outputs.needs_sync == 'true' && steps.merge.outputs.conflict == 'false'
+      run: ./gradlew assembleDebug
+
+    - name: Push verified merge to fork main
+      if: steps.detect.outputs.needs_sync == 'true' && steps.merge.outputs.conflict == 'false'
+      run: |
+        git fetch origin main
+        git push origin HEAD:main
+        echo "Verified upstream merge pushed to main at $(git rev-parse --short HEAD)." >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Trigger Android CI and release
+      if: steps.detect.outputs.needs_sync == 'true' && steps.merge.outputs.conflict == 'false'
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: gh workflow run android.yml --ref main
+
+    - name: Clean stale conflict PR
+      if: steps.detect.outputs.needs_sync == 'true' && steps.merge.outputs.conflict == 'false'
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        pr_number=$(gh pr list \
+          --head "$SYNC_BRANCH" \
+          --base main \
+          --state open \
+          --json number \
+          --jq '.[0].number // empty')
+
+        if [ -n "$pr_number" ]; then
+          gh pr close "$pr_number" --comment 'Upstream now merges cleanly and has been synced automatically.'
+        fi
+
+        git push origin --delete "$SYNC_BRANCH" >/dev/null 2>&1 || true
